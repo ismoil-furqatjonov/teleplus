@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // User Avatars
+    match /avatars/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Group Avatars
+    match /group_avatars/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Chat Media Files & Voice Messages
+    match /chat_files/{chatId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

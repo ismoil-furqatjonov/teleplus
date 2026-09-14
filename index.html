@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="uz" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>TelePulse (Telepluce) Web - Real-time Chat</title>
+  <meta name="description" content="TelePulse (Telepluce) Web - Real-time muloqot, xabarlar, ovozli xabarlar va guruh suhbatlari uchun zamonaviy platforma.">
+  <meta name="keywords" content="telepluce, telepulse, tele pluce, tele pulse, telepulse web, telepluce chat, telegram web, messendjer, real-time chat">
+  <meta name="author" content="TelePulse">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="TelePulse (Telepluce) - Real-time Chat Web">
+  <meta property="og:description" content="Zamonaviy Telegram uslubidagi xavfsiz va tezkor chat ilovasi.">
+  <meta property="og:site_name" content="TelePulse">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="TelePulse (Telepluce) - Real-time Chat Web">
+  <meta name="twitter:description" content="Zamonaviy Telegram uslubidagi xavfsiz va tezkor chat ilovasi.">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="user-profile-summary" id="current-user-profile-btn" title="Profil sozlamalari">
+          <div class="avatar-wrapper">
+            <img id="my-avatar" class="user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=Me" alt="Avatar">
+            <div class="online-indicator"></div>
+          </div>
+          <div class="user-details">
+            <div class="user-name">
+              <span id="my-display-name">Foydalanuvchi</span>
+              <span class="premium-badge"><i class="fa-solid fa-star"></i> PREMIUM</span>
+            </div>
+            <div class="user-username" id="my-username">@username</div>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="icon-btn" id="share-app-btn" title="Ulashish va QR Kod">
+            <i class="fa-solid fa-qrcode"></i>
+          </button>
+          <button class="icon-btn" id="theme-toggle-btn" title="Mavzuni almashtirish (Mavzu)">
+            <i class="fa-solid fa-moon"></i>
+          </button>
+          <button class="icon-btn" id="logout-btn" title="Tizimdan chiqish">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- SEARCH BOX -->
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="global-search-input" class="search-input" placeholder="Qidiruv (User, Guruh, Xabar)...">
+      </div>
+
+      <!-- FILTER TABS -->
+      <div class="chat-filter-tabs">
+        <div class="filter-tab active" data-tab="all">Barchasi</div>
+        <div class="filter-tab" data-tab="private">Shaxsiy</div>
+        <div class="filter-tab" data-tab="groups">Guruhlar</div>
+        <div class="filter-tab" data-tab="pinned">Pin qilingan</div>
+      </div>
+
+      <!-- CHAT LIST -->
+      <div class="chat-list" id="chat-list-container">
+        <!-- Chats will be rendered here dynamically via JS -->
+      </div>
+
+      <!-- FLOATING ACTION BUTTON -->
+      <button class="fab" id="fab-new-chat" title="Yangi Chat / Guruh">
+        <i class="fa-solid fa-pen"></i>
+      </button>
+    </aside>
+
+    <!-- MAIN CHAT AREA -->
+    <main class="chat-area" id="chat-area">
+      <!-- NO CHAT SELECTED VIEW -->
+      <div class="no-chat-selected" id="no-chat-view">
+        <div class="auth-logo" style="width: 80px; height: 80px; font-size: 40px;">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <h2 style="font-weight: 600;">TelePulse Desktop</h2>
+        <div class="no-chat-pill">Muloqotni boshlash uchun chap paneldan chat tanlang</div>
+      </div>
+
+      <!-- ACTIVE CHAT VIEW (Initially Hidden) -->
+      <div id="active-chat-container" style="display: none; height: 100%; flex-direction: column; width: 100%;">
+        
+        <!-- CHAT HEADER -->
+        <header class="chat-header">
+          <div class="chat-header-info" id="chat-header-info">
+            <button class="icon-btn btn-back" id="btn-mobile-back" title="Orqaga qaytish">
+              <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <div class="avatar-wrapper">
+              <img id="chat-header-avatar" class="user-avatar" src="" alt="Chat Avatar">
+              <div id="chat-header-online-dot" class="online-indicator" style="display: none;"></div>
+            </div>
+            <div>
+              <div class="chat-title" id="chat-header-title">Chat Title</div>
+              <div class="chat-subtitle" id="chat-header-subtitle">online</div>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <button class="icon-btn" id="btn-close-chat" title="Chatni yopish">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <button class="icon-btn" id="btn-chat-info-drawer" title="Ma'lumotlar">
+              <i class="fa-solid fa-circle-info"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- MESSAGES CONTAINER -->
+        <div class="messages-container" id="messages-container">
+          <!-- Messages will be rendered here dynamically -->
+        </div>
+
+        <!-- SCROLL TO BOTTOM BUTTON -->
+        <button class="btn-scroll-bottom" id="btn-scroll-bottom" title="Pastga tushish">
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+
+        <!-- TYPING INDICATOR -->
+        <div class="typing-indicator-bar" id="typing-indicator" style="display: none;">
+          <span class="dot-pulse"></span>
+          <span id="typing-text">yozmoqda...</span>
+        </div>
+
+        <!-- REPLY / EDIT PREVIEW BAR -->
+        <div class="reply-preview-bar" id="reply-preview-bar" style="display: none;">
+          <div class="reply-preview-info">
+            <div class="reply-preview-title" id="reply-preview-title">Javob berilmoqda</div>
+            <div class="reply-preview-text" id="reply-preview-text">Xabar matni</div>
+          </div>
+          <button class="icon-btn" id="btn-cancel-reply" style="width: 28px; height: 28px;">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- VOICE RECORDER BAR (Active while recording audio) -->
+        <div class="voice-recorder-bar" id="voice-recorder-bar" style="display: none;">
+          <div class="recording-time">
+            <span class="recording-dot"></span>
+            <span id="recording-timer">00:00</span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn-secondary" id="btn-cancel-voice" style="padding: 6px 12px; font-size: 13px;">
+              <i class="fa-solid fa-trash"></i> Bekor qilish
+            </button>
+            <button class="btn-primary" id="btn-send-voice" style="padding: 6px 14px; font-size: 13px;">
+              <i class="fa-solid fa-paper-plane"></i> Yuborish
+            </button>
+          </div>
+        </div>
+
+        <!-- UPLOAD PROGRESS BAR -->
+        <div class="progress-bar-container" id="upload-progress-container">
+          <div class="progress-bar-fill" id="upload-progress-fill"></div>
+        </div>
+
+        <!-- CHAT INPUT AREA -->
+        <footer class="chat-input-area" id="chat-input-area">
+          
+          <!-- Attachment Button -->
+          <button class="icon-btn" id="btn-attachment" title="Fayl yuborish">
+            <i class="fa-solid fa-paperclip"></i>
+          </button>
+
+          <!-- Attachment Popover -->
+          <div class="popover-menu" id="attachment-popover">
+            <div class="attachment-options">
+              <label class="attachment-option">
+                <i class="fa-solid fa-image" style="color: #38bdf8;"></i> Rasm yuborish
+                <input type="file" id="file-input-image" accept="image/*" style="display: none;">
+              </label>
+              <label class="attachment-option">
+                <i class="fa-solid fa-video" style="color: #a855f7;"></i> Video yuborish
+                <input type="file" id="file-input-video" accept="video/*" style="display: none;">
+              </label>
+              <label class="attachment-option">
+                <i class="fa-solid fa-file" style="color: #10b981;"></i> Hujjat yuborish
+                <input type="file" id="file-input-doc" accept="*" style="display: none;">
+              </label>
+            </div>
+          </div>
+
+          <!-- Text Input -->
+          <textarea id="message-text-input" class="chat-input" placeholder="Xabar yozing..." rows="1"></textarea>
+
+          <!-- Emoji Picker Button -->
+          <button class="icon-btn" id="btn-emoji-picker" title="Emoji">
+            <i class="fa-regular fa-face-smile"></i>
+          </button>
+
+          <!-- Emoji Popover -->
+          <div class="popover-menu emoji-picker-popover" id="emoji-popover">
+            <div class="emoji-picker-header">
+              <input type="text" id="emoji-search-input" class="emoji-search-input" placeholder="Emoji qidirish...">
+              <div class="emoji-category-tabs" id="emoji-category-tabs">
+                <button class="emoji-tab-btn active" data-category="smileys" title="Tabassumlar">😀</button>
+                <button class="emoji-tab-btn" data-category="gestures" title="Qo'llar & Odamlar">👍</button>
+                <button class="emoji-tab-btn" data-category="hearts" title="Yuraklar">❤️</button>
+                <button class="emoji-tab-btn" data-category="animals" title="Hayvonlar">🐶</button>
+                <button class="emoji-tab-btn" data-category="food" title="Taomlar">🍕</button>
+                <button class="emoji-tab-btn" data-category="activities" title="Sport">⚽</button>
+                <button class="emoji-tab-btn" data-category="travel" title="Sayohat">✈️</button>
+                <button class="emoji-tab-btn" data-category="objects" title="Buyumlar">💡</button>
+              </div>
+            </div>
+            <div class="emoji-grid-container" id="emoji-grid-container">
+              <div class="emoji-grid" id="emoji-grid">
+                <!-- Emojis populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Input Action Buttons (Telegram Style) -->
+          <div class="input-actions-group">
+            <!-- Round Video ("Krujochek") Button -->
+            <button class="icon-btn btn-round-cam" id="btn-round-video" title="Dumaloq video (Krujochek)">
+              <i class="fa-solid fa-circle-play"></i>
+            </button>
+            <!-- Voice Message Button -->
+            <button class="icon-btn btn-mic-action" id="btn-mic" title="Ovozli xabar">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
+            <!-- Send Message Button -->
+            <button class="icon-btn btn-send-action" id="btn-send-message" title="Yuborish" style="display: none;">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+
+        </footer>
+      </div>
+    </main>
+
+    <!-- RIGHT DRAWER (USER / GROUP INFO) -->
+    <aside class="drawer" id="info-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title">Ma'lumotlar</div>
+        <button class="icon-btn" id="btn-close-drawer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="drawer-content" id="drawer-content-body">
+        <!-- Info populated dynamically -->
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- CONTEXT MENU FOR MESSAGES -->
+  <div class="context-menu" id="message-context-menu">
+    <div class="quick-reactions">
+      <span class="emoji-item" data-reaction="👍">👍</span>
+      <span class="emoji-item" data-reaction="❤️">❤️</span>
+      <span class="emoji-item" data-reaction="😂">😂</span>
+      <span class="emoji-item" data-reaction="🔥">🔥</span>
+      <span class="emoji-item" data-reaction="😮">😮</span>
+      <span class="emoji-item" data-reaction="😢">😢</span>
+      <span class="emoji-item" data-reaction="🎉">🎉</span>
+    </div>
+    <div class="context-menu-item" id="ctx-reply"><i class="fa-solid fa-reply"></i> Javob berish</div>
+    <div class="context-menu-item" id="ctx-copy"><i class="fa-solid fa-copy"></i> Nusxalash</div>
+    <div class="context-menu-item" id="ctx-forward"><i class="fa-solid fa-share"></i> Yo'naltirish (Forward)</div>
+    <div class="context-menu-item" id="ctx-edit" style="display: none;"><i class="fa-solid fa-pen"></i> Tahrirlash</div>
+    <div class="context-menu-item danger" id="ctx-delete-for-me"><i class="fa-solid fa-trash"></i> O'zimdan o'chirish</div>
+    <div class="context-menu-item danger" id="ctx-delete-for-everyone" style="display: none;"><i class="fa-solid fa-trash-can"></i> Hamma uchun o'chirish</div>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- 1. NEW CHAT / USER SEARCH MODAL -->
+  <div class="modal-overlay" id="modal-new-chat">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Yangi Chat Boshlash</div>
+        <button class="icon-btn modal-close" data-modal="modal-new-chat"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Username bo'yicha qidiruv</label>
+          <div style="position: relative;">
+            <span style="position: absolute; left: 14px; top: 12px; color: var(--text-muted);">@</span>
+            <input type="text" id="search-username-input" class="form-input" style="padding-left: 30px;" placeholder="username kiritib qidiriring...">
+          </div>
+        </div>
+        <div class="user-select-list" id="search-users-result">
+          <!-- Results -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-new-chat">Yopish</button>
+        <button class="btn-primary" id="btn-create-group-instead"><i class="fa-solid fa-users"></i> Yangi Guruh Yaratish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. NEW GROUP MODAL -->
+  <div class="modal-overlay" id="modal-new-group">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Yangi Guruh Yaratish</div>
+        <button class="icon-btn modal-close" data-modal="modal-new-group"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="avatar-picker">
+          <img id="group-avatar-preview" class="avatar-preview" src="https://api.dicebear.com/7.x/identicon/svg?seed=Group" alt="Group Avatar">
+          <label for="group-avatar-input" class="avatar-upload-btn"><i class="fa-solid fa-camera"></i> Guruh rasmi</label>
+          <input type="file" id="group-avatar-input" accept="image/*" style="display: none;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Guruh Nomi</label>
+          <input type="text" id="group-name-input" class="form-input" placeholder="Masalan: Dasturchilar Hamjamiyati" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tavsif (Description)</label>
+          <input type="text" id="group-desc-input" class="form-input" placeholder="Guruh maqsadi...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">A'zolarni Tanlang</label>
+          <div class="user-select-list" id="group-members-select-list">
+            <!-- Members list loaded via JS -->
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-new-group">Bekor qilish</button>
+        <button class="btn-primary" id="btn-submit-create-group"><i class="fa-solid fa-check"></i> Guruhni Yaratish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. EDIT PROFILE MODAL -->
+  <div class="modal-overlay" id="modal-edit-profile">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Profilni Tahrirlash</div>
+        <button class="icon-btn modal-close" data-modal="modal-edit-profile"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="avatar-picker">
+          <img id="edit-profile-avatar-preview" class="avatar-preview" src="" alt="Profile Avatar">
+          <label for="edit-profile-avatar-input" class="avatar-upload-btn"><i class="fa-solid fa-camera"></i> Yangi rasm yuklash</label>
+          <input type="file" id="edit-profile-avatar-input" accept="image/*" style="display: none;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ism va Familiya</label>
+          <input type="text" id="edit-display-name-input" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bio</label>
+          <input type="text" id="edit-bio-input" class="form-input">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-edit-profile">Bekor qilish</button>
+        <button class="btn-primary" id="btn-save-profile"><i class="fa-solid fa-floppy-disk"></i> Saqlash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. FORWARD MESSAGE MODAL -->
+  <div class="modal-overlay" id="modal-forward">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Xabarni Yo'naltirish</div>
+        <button class="icon-btn modal-close" data-modal="modal-forward"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="user-select-list" id="forward-chats-list">
+          <!-- Chat list loaded via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. LIGHTBOX MEDIA VIEWER MODAL (IMAGE & VIDEO) -->
+  <div class="modal-overlay" id="modal-lightbox">
+    <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center;">
+      <div style="position: absolute; top: -45px; right: 0; display: flex; gap: 12px;">
+        <a id="lightbox-download-btn" href="#" download class="icon-btn" style="color: #fff; font-size: 20px;" title="Yuklab olish">
+          <i class="fa-solid fa-download"></i>
+        </a>
+        <button class="icon-btn modal-close" data-modal="modal-lightbox" style="color: #fff; font-size: 22px;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <img id="lightbox-image" src="" alt="Full view" style="max-width: 90vw; max-height: 85vh; border-radius: 12px; object-fit: contain; display: none;">
+      <video id="lightbox-video" src="" controls autoplay playsinline style="max-width: 90vw; max-height: 85vh; border-radius: 12px; display: none;"></video>
+    </div>
+  </div>
+
+  <!-- 5.1 TELEGRAM ROUND VIDEO RECORDER ("KRUJOCHEK") -->
+  <div class="round-video-modal" id="round-video-modal" style="display: none;">
+    <div class="round-video-backdrop"></div>
+    <div class="round-video-container">
+      <div class="round-video-header">
+        <span class="round-recording-dot"></span>
+        <span id="round-video-timer">00:00</span>
+        <span class="round-video-badge">DUMALOQ VIDEO</span>
+      </div>
+      <div class="round-video-circle-wrapper">
+        <video id="round-video-camera-preview" autoplay playsinline muted></video>
+        <svg class="round-video-svg-ring" viewBox="0 0 100 100">
+          <circle class="round-ring-bg" cx="50" cy="50" r="46"></circle>
+          <circle class="round-ring-progress" id="round-ring-progress" cx="50" cy="50" r="46"></circle>
+        </svg>
+      </div>
+      <div class="round-video-actions">
+        <button class="round-action-btn cancel" id="btn-cancel-round-video" title="Bekor qilish">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+        <button class="round-action-btn switch-cam" id="btn-switch-camera" title="Kamerani almashtirish">
+          <i class="fa-solid fa-camera-rotate"></i>
+        </button>
+        <button class="round-action-btn send" id="btn-send-round-video" title="Yuborish">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. SHARE APP & QR CODE MODAL -->
+  <div class="modal-overlay" id="modal-share-app">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-qrcode" style="color:var(--accent-color);"></i> Ilovaga Ulashish (QR Kod)</div>
+        <button class="icon-btn modal-close" data-modal="modal-share-app"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+          Bir xil Wi-Fi (Lokal tarmoq) dagi telefondan yoki boshqa kompyuterlardan kirish uchun quyidagi QR kodni skanerlang:
+        </p>
+
+        <div style="background: #ffffff; padding: 16px; border-radius: 16px; display: inline-block; box-shadow: var(--shadow-md); margin-bottom: 16px;">
+          <img id="qr-code-img" src="" alt="QR Code" style="width: 200px; height: 200px; display: block;">
+        </div>
+
+        <div class="form-group" style="margin-top: 10px; text-align: left;">
+          <label class="form-label">Ssilka (Lokal Tarmoq Manzili):</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="share-url-input" class="form-input" readonly style="font-size: 13px; font-family: monospace;">
+            <button class="btn-primary" id="btn-copy-share-url" style="width: auto; padding: 0 16px; white-space: nowrap;">
+              <i class="fa-solid fa-copy"></i> Nusxalash
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-share-app">Yopish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- SCRIPTS -->
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/profile.js"></script>
+  <script type="module" src="js/chat.js"></script>
+  <script type="module" src="js/group.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

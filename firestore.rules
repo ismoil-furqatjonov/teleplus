@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User Security Rules
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['online', 'lastSeen'])
+      );
+    }
+    
+    // Chat Security Rules (Private & Group)
+    match /chats/{chatId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.uid in resource.data.participants;
+      
+      // Message Security Rules
+      match /messages/{messageId} {
+        allow read: if request.auth != null && 
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        
+        allow create: if request.auth != null && 
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+          request.resource.data.senderId == request.auth.uid;
+          
+        allow update: if request.auth != null && (
+          // Sender can edit/delete for all
+          resource.data.senderId == request.auth.uid ||
+          // Participants can update reactions or deletedFor
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['reactions', 'seenBy', 'deletedFor'])
+        );
+        
+        allow delete: if request.auth != null && resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}
