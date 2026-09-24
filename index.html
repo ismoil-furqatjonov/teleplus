@@ -7,22 +7,17 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>TelePulse (Telepluce) Web - Real-time Chat</title>
-  <meta name="description" content="TelePulse (Telepluce) Web - Real-time muloqot, xabarlar, ovozli xabarlar va guruh suhbatlari uchun zamonaviy platforma.">
-  <meta name="keywords" content="telepluce, telepulse, tele pluce, tele pulse, telepulse web, telepluce chat, telegram web, messendjer, real-time chat">
+  <title>TelePulse Web Messenger - Modern Real-time Muloqot</title>
+  <meta name="description" content="TelePulse Web - Real-time muloqot, xabarlar, ovozli xabarlar, stories va guruh suhbatlari uchun zamonaviy platforma.">
+  <meta name="keywords" content="telepulse, telepulse web, messendjer, real-time chat, stories">
   <meta name="author" content="TelePulse">
   <meta name="robots" content="index, follow">
 
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="TelePulse (Telepluce) - Real-time Chat Web">
-  <meta property="og:description" content="Zamonaviy Telegram uslubidagi xavfsiz va tezkor chat ilovasi.">
+  <meta property="og:title" content="TelePulse - Real-time Chat Web">
+  <meta property="og:description" content="Zamonaviy va xavfsiz messenger platformasi.">
   <meta property="og:site_name" content="TelePulse">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="TelePulse (Telepluce) - Real-time Chat Web">
-  <meta name="twitter:description" content="Zamonaviy Telegram uslubidagi xavfsiz va tezkor chat ilovasi.">
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -52,10 +47,13 @@
         </div>
 
         <div class="header-actions">
+          <button class="icon-btn" id="btn-open-settings" title="Sozlamalar (Settings)">
+            <i class="fa-solid fa-gear"></i>
+          </button>
           <button class="icon-btn" id="share-app-btn" title="Ulashish va QR Kod">
             <i class="fa-solid fa-qrcode"></i>
           </button>
-          <button class="icon-btn" id="theme-toggle-btn" title="Mavzuni almashtirish (Mavzu)">
+          <button class="icon-btn" id="theme-toggle-btn" title="Mavzuni almashtirish">
             <i class="fa-solid fa-moon"></i>
           </button>
           <button class="icon-btn" id="logout-btn" title="Tizimdan chiqish">
@@ -64,10 +62,21 @@
         </div>
       </div>
 
+      <!-- STORIES BAR -->
+      <div class="stories-bar-wrapper">
+        <div class="stories-title">Stories <span class="badge-new">24h</span></div>
+        <div class="stories-container" id="stories-container">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
       <!-- SEARCH BOX -->
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
         <input type="text" id="global-search-input" class="search-input" placeholder="Qidiruv (User, Guruh, Xabar)...">
+        <button id="btn-clear-search" class="btn-clear-search" style="display: none;" title="Tozalash">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </button>
       </div>
 
       <!-- FILTER TABS -->
@@ -80,7 +89,7 @@
 
       <!-- CHAT LIST -->
       <div class="chat-list" id="chat-list-container">
-        <!-- Chats will be rendered here dynamically via JS -->
+        <!-- Chats rendered dynamically -->
       </div>
 
       <!-- FLOATING ACTION BUTTON -->
@@ -100,7 +109,7 @@
         <div class="no-chat-pill">Muloqotni boshlash uchun chap paneldan chat tanlang</div>
       </div>
 
-      <!-- ACTIVE CHAT VIEW (Initially Hidden) -->
+      <!-- ACTIVE CHAT VIEW -->
       <div id="active-chat-container" style="display: none; height: 100%; flex-direction: column; width: 100%;">
         
         <!-- CHAT HEADER -->
@@ -129,9 +138,18 @@
           </div>
         </header>
 
+        <!-- PINNED MESSAGE BANNER -->
+        <div class="chat-pinned-banner" id="chat-pinned-banner" style="display: none;">
+          <i class="fa-solid fa-thumbtack" style="color: var(--accent-color);"></i>
+          <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            <span style="font-weight: 600; color: var(--accent-color);">📌 Pinned Message: </span>
+            <span id="chat-pinned-text">Matn...</span>
+          </div>
+        </div>
+
         <!-- MESSAGES CONTAINER -->
         <div class="messages-container" id="messages-container">
-          <!-- Messages will be rendered here dynamically -->
+          <!-- Messages rendered dynamically -->
         </div>
 
         <!-- SCROLL TO BOTTOM BUTTON -->
@@ -156,7 +174,7 @@
           </button>
         </div>
 
-        <!-- VOICE RECORDER BAR (Active while recording audio) -->
+        <!-- VOICE RECORDER BAR -->
         <div class="voice-recorder-bar" id="voice-recorder-bar" style="display: none;">
           <div class="recording-time">
             <span class="recording-dot"></span>
@@ -179,8 +197,6 @@
 
         <!-- CHAT INPUT AREA -->
         <footer class="chat-input-area" id="chat-input-area">
-          
-          <!-- Attachment Button -->
           <button class="icon-btn" id="btn-attachment" title="Fayl yuborish">
             <i class="fa-solid fa-paperclip"></i>
           </button>
@@ -197,7 +213,7 @@
                 <input type="file" id="file-input-video" accept="video/*" style="display: none;">
               </label>
               <label class="attachment-option">
-                <i class="fa-solid fa-file" style="color: #10b981;"></i> Hujjat yuborish
+                <i class="fa-solid fa-file" style="color: #10b981;"></i> Hujjat (PDF, DOC, ZIP)
                 <input type="file" id="file-input-doc" accept="*" style="display: none;">
               </label>
             </div>
@@ -207,7 +223,7 @@
           <textarea id="message-text-input" class="chat-input" placeholder="Xabar yozing..." rows="1"></textarea>
 
           <!-- Emoji Picker Button -->
-          <button class="icon-btn" id="btn-emoji-picker" title="Emoji">
+          <button class="icon-btn" id="btn-emoji-picker" title="Emoji & Sticker">
             <i class="fa-regular fa-face-smile"></i>
           </button>
 
@@ -217,13 +233,9 @@
               <input type="text" id="emoji-search-input" class="emoji-search-input" placeholder="Emoji qidirish...">
               <div class="emoji-category-tabs" id="emoji-category-tabs">
                 <button class="emoji-tab-btn active" data-category="smileys" title="Tabassumlar">😀</button>
-                <button class="emoji-tab-btn" data-category="gestures" title="Qo'llar & Odamlar">👍</button>
+                <button class="emoji-tab-btn" data-category="gestures" title="Qo'llar">👍</button>
                 <button class="emoji-tab-btn" data-category="hearts" title="Yuraklar">❤️</button>
-                <button class="emoji-tab-btn" data-category="animals" title="Hayvonlar">🐶</button>
-                <button class="emoji-tab-btn" data-category="food" title="Taomlar">🍕</button>
-                <button class="emoji-tab-btn" data-category="activities" title="Sport">⚽</button>
-                <button class="emoji-tab-btn" data-category="travel" title="Sayohat">✈️</button>
-                <button class="emoji-tab-btn" data-category="objects" title="Buyumlar">💡</button>
+                <button class="emoji-tab-btn" data-category="stickers" title="Stickerlar">🎨</button>
               </div>
             </div>
             <div class="emoji-grid-container" id="emoji-grid-container">
@@ -233,17 +245,14 @@
             </div>
           </div>
 
-          <!-- Input Action Buttons (Telegram Style) -->
+          <!-- Input Action Buttons -->
           <div class="input-actions-group">
-            <!-- Round Video ("Krujochek") Button -->
             <button class="icon-btn btn-round-cam" id="btn-round-video" title="Dumaloq video (Krujochek)">
               <i class="fa-solid fa-circle-play"></i>
             </button>
-            <!-- Voice Message Button -->
             <button class="icon-btn btn-mic-action" id="btn-mic" title="Ovozli xabar">
               <i class="fa-solid fa-microphone"></i>
             </button>
-            <!-- Send Message Button -->
             <button class="icon-btn btn-send-action" id="btn-send-message" title="Yuborish" style="display: none;">
               <i class="fa-solid fa-paper-plane"></i>
             </button>
@@ -253,7 +262,7 @@
       </div>
     </main>
 
-    <!-- RIGHT DRAWER (USER / GROUP INFO) -->
+    <!-- RIGHT DRAWER (INFO) -->
     <aside class="drawer" id="info-drawer">
       <div class="drawer-header">
         <div class="drawer-title">Ma'lumotlar</div>
@@ -262,7 +271,7 @@
         </button>
       </div>
       <div class="drawer-content" id="drawer-content-body">
-        <!-- Info populated dynamically -->
+        <!-- Dynamically populated -->
       </div>
     </aside>
 
@@ -276,11 +285,10 @@
       <span class="emoji-item" data-reaction="😂">😂</span>
       <span class="emoji-item" data-reaction="🔥">🔥</span>
       <span class="emoji-item" data-reaction="😮">😮</span>
-      <span class="emoji-item" data-reaction="😢">😢</span>
-      <span class="emoji-item" data-reaction="🎉">🎉</span>
     </div>
     <div class="context-menu-item" id="ctx-reply"><i class="fa-solid fa-reply"></i> Javob berish</div>
     <div class="context-menu-item" id="ctx-copy"><i class="fa-solid fa-copy"></i> Nusxalash</div>
+    <div class="context-menu-item" id="ctx-pin"><i class="fa-solid fa-thumbtack"></i> Pin qilish (Yuqoriga)</div>
     <div class="context-menu-item" id="ctx-forward"><i class="fa-solid fa-share"></i> Yo'naltirish (Forward)</div>
     <div class="context-menu-item" id="ctx-edit" style="display: none;"><i class="fa-solid fa-pen"></i> Tahrirlash</div>
     <div class="context-menu-item danger" id="ctx-delete-for-me"><i class="fa-solid fa-trash"></i> O'zimdan o'chirish</div>
@@ -289,7 +297,177 @@
 
   <!-- MODALS -->
 
-  <!-- 1. NEW CHAT / USER SEARCH MODAL -->
+  <!-- 1. SETTINGS MODAL -->
+  <div class="modal-overlay" id="modal-settings">
+    <div class="modal-card modal-settings-card">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-gear" style="color:var(--accent-color);"></i> Sozlamalar</div>
+        <button class="icon-btn modal-close" data-modal="modal-settings"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body settings-layout-body">
+        <div class="settings-sidebar-tabs">
+          <div class="settings-tab-item active" data-section="profile"><i class="fa-solid fa-user"></i> Profil</div>
+          <div class="settings-tab-item" data-section="privacy"><i class="fa-solid fa-lock"></i> Maxfiylik</div>
+          <div class="settings-tab-item" data-section="notifications"><i class="fa-solid fa-bell"></i> Bildirishnomalar</div>
+          <div class="settings-tab-item" data-section="appearance"><i class="fa-solid fa-palette"></i> Ko'rinish</div>
+          <div class="settings-tab-item" data-section="security"><i class="fa-solid fa-shield-halved"></i> Xavfsizlik</div>
+          <div class="settings-tab-item" data-section="about"><i class="fa-solid fa-circle-info"></i> Haqida</div>
+        </div>
+        <div class="settings-content-area">
+          <!-- Profile Panel -->
+          <div class="settings-section-panel active" id="settings-sec-profile">
+            <div class="settings-card-box text-center">
+              <img id="setting-profile-avatar" class="user-avatar" style="width:80px;height:80px;margin:0 auto;" src="" alt="">
+              <h3 id="setting-profile-name" style="margin-top:10px;font-weight:700;">Foydalanuvchi</h3>
+              <div id="setting-profile-username" style="color:var(--text-muted);font-size:13px;">@username</div>
+              <div id="setting-profile-email" style="color:var(--text-secondary);font-size:12px;margin-top:2px;">email@telepulse.app</div>
+              <button class="btn-primary" id="btn-edit-profile-trigger" style="margin-top:14px;" onclick="document.getElementById('modal-edit-profile').classList.add('active')">
+                <i class="fa-solid fa-pen"></i> Profilni tahrirlash
+              </button>
+            </div>
+          </div>
+          <!-- Privacy Panel -->
+          <div class="settings-section-panel" id="settings-sec-privacy">
+            <h4>Maxfiylik sozlamalari</h4>
+            <div class="form-group">
+              <label class="form-label">Oxirgi ko'ringan vaqt (Last Seen)</label>
+              <select class="form-input">
+                <option selected>Hamma uchun ochiq</option>
+                <option>Faqat kontaktlar</option>
+                <option>Hech kimga</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Profil rasmini ko'rish</label>
+              <select class="form-input">
+                <option selected>Hamma uchun</option>
+                <option>Faqat kontaktlar</option>
+              </select>
+            </div>
+          </div>
+          <!-- Notifications Panel -->
+          <div class="settings-section-panel" id="settings-sec-notifications">
+            <h4>Bildirishnomalar</h4>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-color);">
+              <div>
+                <div style="font-weight:600;">Ovozli bildirishnoma</div>
+                <div style="font-size:12px;color:var(--text-muted);">Yangi xabarlarda ovoz chiqarish</div>
+              </div>
+              <input type="checkbox" id="setting-sound-toggle" checked style="accent-color:var(--accent-color);transform:scale(1.3);">
+            </div>
+          </div>
+          <!-- Appearance Panel -->
+          <div class="settings-section-panel" id="settings-sec-appearance">
+            <h4>Mavzuni tanlash</h4>
+            <div style="display:flex;gap:12px;margin-top:10px;">
+              <div class="theme-option-card active" data-theme="dark">
+                <i class="fa-solid fa-moon"></i> Tungi (Dark)
+              </div>
+              <div class="theme-option-card" data-theme="light">
+                <i class="fa-solid fa-sun"></i> Kungi (Light)
+              </div>
+            </div>
+          </div>
+          <!-- Security Panel -->
+          <div class="settings-section-panel" id="settings-sec-security">
+            <h4>Xavfsizlik & Autentifikatsiya</h4>
+            <div class="settings-card-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-weight:600;">2-bosqichli tasdiqlash (2FA)</div>
+                  <div id="2fa-status-text" style="font-size:12px;color:var(--text-muted);">O'chirilgan</div>
+                </div>
+                <button class="btn-primary" id="btn-toggle-2fa" style="width:auto;padding:6px 14px;font-size:13px;" onclick="window.toggle2FADemo()">Yoqish</button>
+              </div>
+            </div>
+          </div>
+          <!-- About Panel -->
+          <div class="settings-section-panel" id="settings-sec-about">
+            <div class="text-center">
+              <div class="auth-logo" style="width:50px;height:50px;font-size:24px;margin:0 auto 10px;">
+                <i class="fa-solid fa-paper-plane"></i>
+              </div>
+              <h3 style="font-weight:700;">TelePulse Web</h3>
+              <div style="font-size:12px;color:var(--text-muted);">Versiya 2.5.0 (Pro Release)</div>
+              <p style="font-size:13px;color:var(--text-secondary);margin-top:10px;">TelePulse — zamonaviy, xavfsiz va tezyurar messenjer loyihasi.</p>
+              <div class="footer-links" style="margin-top:16px;">
+                <a href="#">Biz haqimizda</a> • <a href="#">Maxfiylik</a> • <a href="#">Shartlar</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. CREATE STORY MODAL -->
+  <div class="modal-overlay" id="modal-create-story">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Story Joylash (24 soat)</div>
+        <button class="icon-btn modal-close" data-modal="modal-create-story"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="avatar-picker">
+          <img id="story-preview-img" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; display: none; margin-bottom: 10px;" src="" alt="Story Preview">
+          <label for="story-file-input" class="btn-secondary" style="cursor: pointer;"><i class="fa-solid fa-image"></i> Media tanlash (Rasm/Video)</label>
+          <input type="file" id="story-file-input" accept="image/*,video/*" style="display: none;">
+        </div>
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Tavsif (Caption)</label>
+          <input type="text" id="story-caption-input" class="form-input" placeholder="Nimadir yozing...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-create-story">Bekor qilish</button>
+        <button class="btn-primary" id="btn-submit-story"><i class="fa-solid fa-paper-plane"></i> Storyni joylash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. STORY VIEWER MODAL -->
+  <div class="modal-overlay story-viewer-modal" id="modal-story-viewer">
+    <div class="story-viewer-card">
+      <div class="story-progress-bar">
+        <div class="story-progress-fill" id="story-progress-bar-fill"></div>
+      </div>
+      <div class="story-header-bar">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <img id="story-view-avatar" class="user-avatar" style="width: 36px; height: 36px;" src="" alt="">
+          <div>
+            <div id="story-view-name" style="font-weight: 600; font-size: 13px; color: #fff;">User</div>
+            <div id="story-view-time" style="font-size: 11px; color: rgba(255,255,255,0.7);">00:00</div>
+          </div>
+        </div>
+        <button class="icon-btn" id="btn-story-close" style="color: #fff;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <img id="story-view-media" class="story-media-display" src="" alt="Story">
+      <div id="story-view-caption" class="story-caption-bar"></div>
+
+      <button class="story-nav-btn prev" id="btn-story-prev"><i class="fa-solid fa-chevron-left"></i></button>
+      <button class="story-nav-btn next" id="btn-story-next"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </div>
+
+  <!-- 4. LOGOUT CONFIRM MODAL -->
+  <div class="modal-overlay" id="modal-logout-confirm">
+    <div class="modal-card" style="max-width: 360px;">
+      <div class="modal-header">
+        <div class="modal-title">Tizimdan chiqish</div>
+        <button class="icon-btn modal-close" data-modal="modal-logout-confirm"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="text-align: center; padding: 20px 0;">
+        <i class="fa-solid fa-right-from-bracket" style="font-size: 42px; color: var(--danger-color); margin-bottom: 12px;"></i>
+        <p style="font-size: 14px; color: var(--text-secondary);">Haqiqatan ham TelePulse hisobingizdan chiqmoqchimisiz?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-logout-confirm">Yo'q, qolish</button>
+        <button class="btn-primary" style="background: var(--danger-color);" onclick="window.executeLogout()">Ha, Chiqish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. NEW CHAT / USER SEARCH MODAL -->
   <div class="modal-overlay" id="modal-new-chat">
     <div class="modal-card">
       <div class="modal-header">
@@ -304,9 +482,7 @@
             <input type="text" id="search-username-input" class="form-input" style="padding-left: 30px;" placeholder="username kiritib qidiriring...">
           </div>
         </div>
-        <div class="user-select-list" id="search-users-result">
-          <!-- Results -->
-        </div>
+        <div class="user-select-list" id="search-users-result"></div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary modal-close" data-modal="modal-new-chat">Yopish</button>
@@ -315,7 +491,7 @@
     </div>
   </div>
 
-  <!-- 2. NEW GROUP MODAL -->
+  <!-- 6. NEW GROUP MODAL -->
   <div class="modal-overlay" id="modal-new-group">
     <div class="modal-card">
       <div class="modal-header">
@@ -338,9 +514,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">A'zolarni Tanlang</label>
-          <div class="user-select-list" id="group-members-select-list">
-            <!-- Members list loaded via JS -->
-          </div>
+          <div class="user-select-list" id="group-members-select-list"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -350,7 +524,7 @@
     </div>
   </div>
 
-  <!-- 3. EDIT PROFILE MODAL -->
+  <!-- 7. EDIT PROFILE MODAL -->
   <div class="modal-overlay" id="modal-edit-profile">
     <div class="modal-card">
       <div class="modal-header">
@@ -379,7 +553,7 @@
     </div>
   </div>
 
-  <!-- 4. FORWARD MESSAGE MODAL -->
+  <!-- 8. FORWARD MESSAGE MODAL -->
   <div class="modal-overlay" id="modal-forward">
     <div class="modal-card">
       <div class="modal-header">
@@ -387,14 +561,12 @@
         <button class="icon-btn modal-close" data-modal="modal-forward"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
-        <div class="user-select-list" id="forward-chats-list">
-          <!-- Chat list loaded via JS -->
-        </div>
+        <div class="user-select-list" id="forward-chats-list"></div>
       </div>
     </div>
   </div>
 
-  <!-- 5. LIGHTBOX MEDIA VIEWER MODAL (IMAGE & VIDEO) -->
+  <!-- 9. LIGHTBOX MEDIA VIEWER MODAL -->
   <div class="modal-overlay" id="modal-lightbox">
     <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center;">
       <div style="position: absolute; top: -45px; right: 0; display: flex; gap: 12px;">
@@ -410,7 +582,7 @@
     </div>
   </div>
 
-  <!-- 5.1 TELEGRAM ROUND VIDEO RECORDER ("KRUJOCHEK") -->
+  <!-- 10. TELEGRAM ROUND VIDEO RECORDER -->
   <div class="round-video-modal" id="round-video-modal" style="display: none;">
     <div class="round-video-backdrop"></div>
     <div class="round-video-container">
@@ -440,7 +612,7 @@
     </div>
   </div>
 
-  <!-- 6. SHARE APP & QR CODE MODAL -->
+  <!-- 11. SHARE APP & QR CODE MODAL -->
   <div class="modal-overlay" id="modal-share-app">
     <div class="modal-card">
       <div class="modal-header">
@@ -449,7 +621,7 @@
       </div>
       <div class="modal-body" style="text-align: center;">
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-          Bir xil Wi-Fi (Lokal tarmoq) dagi telefondan yoki boshqa kompyuterlardan kirish uchun quyidagi QR kodni skanerlang:
+          Bir xil Wi-Fi tarmoqdagi telefondan yoki boshqa kompyuterlardan kirish uchun quyidagi QR kodni skanerlang:
         </p>
 
         <div style="background: #ffffff; padding: 16px; border-radius: 16px; display: inline-block; box-shadow: var(--shadow-md); margin-bottom: 16px;">
@@ -459,7 +631,7 @@
         <div class="form-group" style="margin-top: 10px; text-align: left;">
           <label class="form-label">Ssilka (Lokal Tarmoq Manzili):</label>
           <div style="display: flex; gap: 8px;">
-            <input type="text" id="share-url-input" class="form-input" readonly style="font-size: 13px; font-family: monospace;">
+            <input type="text" id="share-url-input" class="form-input" style="font-size: 13px; font-family: monospace;">
             <button class="btn-primary" id="btn-copy-share-url" style="width: auto; padding: 0 16px; white-space: nowrap;">
               <i class="fa-solid fa-copy"></i> Nusxalash
             </button>
@@ -477,10 +649,13 @@
 
   <!-- SCRIPTS -->
   <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/store.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/profile.js"></script>
   <script type="module" src="js/chat.js"></script>
   <script type="module" src="js/group.js"></script>
+  <script type="module" src="js/story.js"></script>
+  <script type="module" src="js/settings.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

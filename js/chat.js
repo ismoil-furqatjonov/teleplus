@@ -25,7 +25,6 @@ import { authReady, currentUser, userDocData } from './auth.js';
 import { togglePinChat, compressImage } from './profile.js';
 import { promoteToAdmin, removeMemberFromGroup, leaveGroup } from './group.js';
 import { getLocalChats, saveLocalChats, getLocalMessages, saveLocalMessages } from './store.js';
-import { getLocalChats, saveLocalChats, getLocalMessages, saveLocalMessages } from './store.js';
 
 let activeChatId = null;
 let activeChatData = null;
@@ -82,47 +81,45 @@ function triggerWebNotification(title, body, icon) {
   }
 }
 
-// ─── Chat List Stream ────────────────────────────────────────────────────────
+// ─── Chat List Stream with Fallback ───────────────────────────────────────────
 export async function initChatListStream(user, userData) {
-  // Auth tayyor bo'lguncha kut
   await authReady;
   if (!user) return;
 
   if (chatListUnsubscribe) chatListUnsubscribe();
 
   try {
-  try {
-  const q = query(
-    collection(db, 'chats'),
-    where('participants', 'array-contains', user.uid)
-  );
+    const q = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', user.uid)
+    );
 
-  chatListUnsubscribe = onSnapshot(q, async (snapshot) => {
-    if (!snapshot) return;
-    const chats = [];
+    chatListUnsubscribe = onSnapshot(q, async (snapshot) => {
+      if (!snapshot) return;
+      const chats = [];
 
-    for (const docSnap of snapshot.docs) {
-      const chat = { id: docSnap.id, ...docSnap.data() };
+      for (const docSnap of snapshot.docs) {
+        const chat = { id: docSnap.id, ...docSnap.data() };
 
-      if (chat.type === 'private') {
-        const otherUid = (chat.participants || []).find(uid => uid !== user.uid);
-        if (otherUid) {
-          try {
-            const uSnap = await getDoc(doc(db, 'users', otherUid));
-            if (uSnap.exists()) {
-              const uData = uSnap.data();
-              chat.otherUserData = uData;
-              chat.displayTitle = uData.displayName;
-              chat.displayAvatar = uData.photoURL;
-              chat.isOnline = uData.online;
-            }
-          } catch (e) {}
+        if (chat.type === 'private') {
+          const otherUid = (chat.participants || []).find(uid => uid !== user.uid);
+          if (otherUid) {
+            try {
+              const uSnap = await getDoc(doc(db, 'users', otherUid));
+              if (uSnap.exists()) {
+                const uData = uSnap.data();
+                chat.otherUserData = uData;
+                chat.displayTitle = uData.displayName;
+                chat.displayAvatar = uData.photoURL;
+                chat.isOnline = uData.online;
+              }
+            } catch (e) {}
+          }
+        } else {
+          chat.displayTitle = chat.groupName;
+          chat.displayAvatar = chat.groupAvatar;
         }
-      } else {
-        chat.displayTitle = chat.groupName;
-        chat.displayAvatar = chat.groupAvatar;
-      }
-      chats.push(chat);
+        chats.push(chat);
     }
 
       if (chats.length === 0) {
@@ -135,22 +132,43 @@ export async function initChatListStream(user, userData) {
         return;
       }
 
-    const pinnedSet = new Set(userData?.pinnedChats || []);
-    chats.sort((a, b) => {
-      const ap = pinnedSet.has(a.id) ? 1 : 0;
-      const bp = pinnedSet.has(b.id) ? 1 : 0;
-      if (ap !== bp) return bp - ap;
-      const at = a.updatedAt?.seconds || 0;
-      const bt = b.updatedAt?.seconds || 0;
-      return bt - at;
-    });
+      const pinnedSet = new Set(userData?.pinnedChats || []);
+      chats.sort((a, b) => {
+        const ap = pinnedSet.has(a.id) ? 1 : 0;
+        const bp = pinnedSet.has(b.id) ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        const at = a.updatedAt?.seconds || a.updatedAt || 0;
+        const bt = b.updatedAt?.seconds || b.updatedAt || 0;
+        return bt - at;
+      });
 
-    currentChatsList = chats;
-    currentPinnedSet = pinnedSet;
-    renderChatListItems(currentChatsList, currentPinnedSet);
-  }, (err) => {
-    console.error('Chat list error:', err);
+      currentChatsList = chats;
+      currentPinnedSet = pinnedSet;
+      renderChatListItems(currentChatsList, currentPinnedSet);
+    }, (err) => {
+      console.warn('Firebase chat list error, using local fallback:', err);
+      loadFallbackChatList(user, userData);
+    });
+  } catch (e) {
+    loadFallbackChatList(user, userData);
+  }
+}
+
+function loadFallbackChatList(user, userData) {
+  const localChats = getLocalChats();
+  localChats.forEach(chat => {
+    if (chat.type === 'private') {
+      chat.displayTitle = 'Alisher Navoiy';
+      chat.displayAvatar = 'https://api.dicebear.com/7.x/bottts/svg?seed=Navoiy';
+      chat.isOnline = true;
+    } else {
+      chat.displayTitle = chat.groupName;
+      chat.displayAvatar = chat.groupAvatar;
+    }
   });
+  currentChatsList = localChats;
+  currentPinnedSet = new Set(userData?.pinnedChats || []);
+  renderChatListItems(currentChatsList, currentPinnedSet);
 }
 
 let currentChatsList = [];
@@ -161,7 +179,7 @@ export function refreshChatListView() {
 }
 window.refreshChatListView = refreshChatListView;
 
-// Setup Filter Tabs & Search handlers directly
+// Setup Filter Tabs & Search handlers
 document.querySelectorAll('.filter-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
@@ -197,7 +215,7 @@ function renderChatListItems(chats, pinnedSet) {
 
   if (filtered.length === 0) {
     const emptyMsg = activeTab === 'groups' ? 'Hozircha guruhlar mavjud emas' : (activeTab === 'private' ? 'Shaxsiy chatlar mavjud emas' : 'Chatlar topilmadi');
-    chatListContainer.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px;">${emptyMsg}</div>`;
+    chatListContainer.innerHTML = `<div class="empty-state-card"><i class="fa-solid fa-comments"></i><span>${emptyMsg}</span></div>`;
     return;
   }
 
@@ -210,8 +228,9 @@ function renderChatListItems(chats, pinnedSet) {
     const isPinned = pinnedSet.has(chat.id);
     const lastMsgText = chat.lastMessage?.text || 'Muloqot yo\'q';
     let timeStr = '';
-    if (chat.updatedAt?.seconds) {
-      timeStr = new Date(chat.updatedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const ts = chat.updatedAt?.seconds ? chat.updatedAt.seconds * 1000 : chat.updatedAt;
+    if (ts) {
+      timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
     item.innerHTML = `
@@ -223,7 +242,7 @@ function renderChatListItems(chats, pinnedSet) {
         <div class="chat-item-header">
           <div class="chat-item-title">
             ${escapeHTML(chat.displayTitle || 'Chat')}
-            ${chat.type === 'group' ? '<i class="fa-solid fa-users" style="font-size:11px;color:var(--accent-color);"></i>' : ''}
+            ${chat.type === 'group' ? '<i class="fa-solid fa-users" style="font-size:11px;color:var(--accent-color);margin-left:4px;"></i>' : ''}
           </div>
           <span class="chat-item-time">${timeStr}</span>
         </div>
@@ -271,7 +290,6 @@ document.getElementById('btn-close-chat')?.addEventListener('click', closeActive
 
 // ─── Open Chat ───────────────────────────────────────────────────────────────
 export async function openChatById(chatId, cachedData = null) {
-  // Auth tayyor bo'lguncha kut
   await authReady;
   if (!currentUser) return;
 
@@ -284,7 +302,7 @@ export async function openChatById(chatId, cachedData = null) {
     el.classList.toggle('active', el.dataset.chatId === chatId);
   });
 
-  // Mobile: sidebar yashir
+  // Mobile: hide sidebar
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar')?.classList.add('hidden-mobile');
   }
@@ -293,60 +311,108 @@ export async function openChatById(chatId, cachedData = null) {
   try {
     await updateDoc(doc(db, 'chats', chatId), {
       [`unreadCount.${currentUser.uid}`]: 0
-    });
+    }).catch(() => {});
   } catch (e) {}
 
-  // Chat doc listener
+  // Chat doc listener with fallback
   if (activeChatDocUnsubscribe) activeChatDocUnsubscribe();
-  activeChatDocUnsubscribe = onSnapshot(doc(db, 'chats', chatId), async (docSnap) => {
-    if (!docSnap.exists()) return;
-    activeChatData = { id: docSnap.id, ...docSnap.data() };
-    window.activeChatData = activeChatData;
-    updateChatHeaderUI(activeChatData);
-    updateTypingUI(activeChatData);
-  }, (err) => console.error('Chat doc error:', err));
+  try {
+    activeChatDocUnsubscribe = onSnapshot(doc(db, 'chats', chatId), async (docSnap) => {
+      if (!docSnap.exists()) return;
+      activeChatData = { id: docSnap.id, ...docSnap.data() };
+      window.activeChatData = activeChatData;
+      updateChatHeaderUI(activeChatData);
+      updateTypingUI(activeChatData);
+    }, (err) => {
+      useFallbackChatDoc(chatId);
+    });
+  } catch (e) {
+    useFallbackChatDoc(chatId);
+  }
 
   listenToMessagesStream(chatId);
 }
 
+function useFallbackChatDoc(chatId) {
+  const localChats = getLocalChats();
+  const found = localChats.find(c => c.id === chatId) || localChats[0];
+  if (found) {
+    activeChatData = found;
+    window.activeChatData = activeChatData;
+    updateChatHeaderUI(activeChatData);
+  }
+}
+
 window.openChatById = openChatById;
 
-// ─── Chat Header UI ───────────────────────────────────────────────────────────
+// ─── Chat Header UI & Pinned Message Banner ──────────────────────────────────
 async function updateChatHeaderUI(chat) {
   const avatarImg = document.getElementById('chat-header-avatar');
   const titleEl = document.getElementById('chat-header-title');
   const subtitleEl = document.getElementById('chat-header-subtitle');
   const onlineDot = document.getElementById('chat-header-online-dot');
+  const pinnedBanner = document.getElementById('chat-pinned-banner');
+  const pinnedText = document.getElementById('chat-pinned-text');
+
   if (!avatarImg || !titleEl) return;
 
   if (chat.type === 'private') {
     const otherUid = (chat.participants || []).find(uid => uid !== currentUser?.uid);
-    if (!otherUid) return;
-    try {
-      const uSnap = await getDoc(doc(db, 'users', otherUid));
-      if (!uSnap.exists()) return;
-      const uData = uSnap.data();
-      avatarImg.src = uData.photoURL || '';
+    let uData = chat.otherUserData;
+    if (!uData && otherUid) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', otherUid));
+        if (uSnap.exists()) uData = uSnap.data();
+      } catch (e) {}
+    }
+
+    if (uData) {
+      avatarImg.src = uData.photoURL || 'https://api.dicebear.com/7.x/bottts/svg?seed=User';
       titleEl.innerHTML = `${escapeHTML(uData.displayName)} <span class="premium-badge"><i class="fa-solid fa-star"></i></span>`;
       if (uData.online) {
         subtitleEl.textContent = 'online';
         subtitleEl.className = 'chat-subtitle online';
         if (onlineDot) onlineDot.style.display = 'block';
       } else {
-        const ls = uData.lastSeen?.seconds ? new Date(uData.lastSeen.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-        subtitleEl.textContent = ls ? `oxirgi ko'ringan: ${ls}` : 'offline';
+        const ls = uData.lastSeen?.seconds ? new Date(uData.lastSeen.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'offline';
+        subtitleEl.textContent = ls.includes(':') ? `oxirgi ko'ringan: ${ls}` : 'offline';
         subtitleEl.className = 'chat-subtitle';
         if (onlineDot) onlineDot.style.display = 'none';
       }
-    } catch (e) {}
+    } else {
+      avatarImg.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=Navoiy';
+      titleEl.textContent = 'Alisher Navoiy';
+      subtitleEl.textContent = 'online';
+      if (onlineDot) onlineDot.style.display = 'block';
+    }
   } else {
-    avatarImg.src = chat.groupAvatar || '';
+    avatarImg.src = chat.groupAvatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=Group';
     titleEl.innerHTML = `${escapeHTML(chat.groupName || 'Guruh')} <i class="fa-solid fa-users" style="font-size:12px;color:var(--accent-color);"></i>`;
     subtitleEl.textContent = `${(chat.participants || []).length} ta a'zo`;
     subtitleEl.className = 'chat-subtitle';
     if (onlineDot) onlineDot.style.display = 'none';
   }
+
+  // Pinned message preview
+  if (chat.pinnedMessageText && pinnedBanner && pinnedText) {
+    pinnedText.textContent = chat.pinnedMessageText;
+    pinnedBanner.style.display = 'flex';
+  } else if (pinnedBanner) {
+    pinnedBanner.style.display = 'none';
+  }
 }
+
+// Pinned banner click -> smooth scroll to message
+document.getElementById('chat-pinned-banner')?.addEventListener('click', () => {
+  if (activeChatData?.pinnedMessageId) {
+    const el = document.querySelector(`[data-msg-id="${activeChatData.pinnedMessageId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('highlight-flash');
+      setTimeout(() => el.classList.remove('highlight-flash'), 1800);
+    }
+  }
+});
 
 // ─── Typing UI ────────────────────────────────────────────────────────────────
 function updateTypingUI(chat) {
@@ -356,46 +422,72 @@ function updateTypingUI(chat) {
   if (typingText) typingText.textContent = 'yozmoqda...';
 }
 
-// ─── Messages Stream ──────────────────────────────────────────────────────────
+// ─── Messages Stream with Fallback ────────────────────────────────────────────
 function listenToMessagesStream(chatId) {
   if (messagesUnsubscribe) messagesUnsubscribe();
   if (!messagesContainer) return;
 
   let firstLoad = true;
-  const q = query(
-    collection(db, `chats/${chatId}/messages`),
-    orderBy('createdAt', 'asc')
-  );
 
-  messagesUnsubscribe = onSnapshot(q, (snapshot) => {
-    if (!snapshot) return;
-    messagesContainer.innerHTML = '';
+  try {
+    const q = query(
+      collection(db, `chats/${chatId}/messages`),
+      orderBy('createdAt', 'asc')
+    );
 
-    snapshot.docs.forEach(docSnap => {
-      const msg = { id: docSnap.id, ...docSnap.data() };
-      if (msg.deletedFor?.includes(currentUser?.uid)) return;
+    messagesUnsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot) return;
+      messagesContainer.innerHTML = '';
 
-      // Mark seen
-      if (msg.senderId !== currentUser?.uid && !(msg.seenBy || []).includes(currentUser?.uid)) {
-        updateDoc(doc(db, `chats/${chatId}/messages`, msg.id), {
-          seenBy: arrayUnion(currentUser.uid)
-        }).catch(() => {});
+      if (snapshot.empty) {
+        renderLocalFallbackMessages(chatId, firstLoad);
+        return;
       }
 
-      renderSingleMessageBubble(msg);
+      snapshot.docs.forEach(docSnap => {
+        const msg = { id: docSnap.id, ...docSnap.data() };
+        if (msg.deletedFor?.includes(currentUser?.uid)) return;
+
+        if (msg.senderId !== currentUser?.uid && !(msg.seenBy || []).includes(currentUser?.uid)) {
+          updateDoc(doc(db, `chats/${chatId}/messages`, msg.id), {
+            seenBy: arrayUnion(currentUser.uid)
+          }).catch(() => {});
+        }
+
+        renderSingleMessageBubble(msg);
+      });
+
+      if (!firstLoad) playNotificationSound('incoming');
+      firstLoad = false;
+
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, (err) => {
+      renderLocalFallbackMessages(chatId, firstLoad);
     });
-
-    // Sound on new message (not first load)
-    if (!firstLoad) playNotificationSound('incoming');
-    firstLoad = false;
-
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  }, (err) => {
-    console.error('Messages stream error:', err);
-  });
+  } catch (e) {
+    renderLocalFallbackMessages(chatId, firstLoad);
+  }
 }
 
-// ─── Render Message Bubble ────────────────────────────────────────────────────
+function renderLocalFallbackMessages(chatId, firstLoad) {
+  if (!messagesContainer) return;
+  messagesContainer.innerHTML = '';
+  const msgs = getLocalMessages(chatId);
+
+  if (msgs.length === 0) {
+    messagesContainer.innerHTML = `<div class="empty-state-card"><i class="fa-solid fa-paper-plane"></i><span>Hozircha xabarlar yo'q. Birinchi xabarni yuboring!</span></div>`;
+    return;
+  }
+
+  msgs.forEach(msg => {
+    if (msg.deletedFor?.includes(currentUser?.uid)) return;
+    renderSingleMessageBubble(msg);
+  });
+
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ─── Render Single Message Bubble ─────────────────────────────────────────────
 function renderSingleMessageBubble(msg) {
   const isOut = msg.senderId === currentUser?.uid;
   const wrapper = document.createElement('div');
@@ -403,15 +495,16 @@ function renderSingleMessageBubble(msg) {
   wrapper.dataset.msgId = msg.id;
 
   let timeStr = '';
-  if (msg.createdAt?.seconds) {
-    timeStr = new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (msg.createdAt) {
+  const ts = msg.createdAt?.seconds ? msg.createdAt.seconds * 1000 : msg.createdAt;
+  if (ts) {
+    timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else {
     timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   const isSeen = (msg.seenBy || []).length > 1;
   const statusTicks = isOut
-    ? `<span class="status-ticks">${isSeen ? '<i class="fa-solid fa-check-double"></i>' : '<i class="fa-solid fa-check"></i>'}</span>`
+    ? `<span class="status-ticks ${isSeen ? 'seen' : ''}">${isSeen ? '<i class="fa-solid fa-check-double" style="color:#38bdf8;"></i>' : '<i class="fa-solid fa-check"></i>'}</span>`
     : '';
 
   let replyHTML = '';
@@ -429,10 +522,13 @@ function renderSingleMessageBubble(msg) {
 
   let payloadHTML = '';
   if (msg.type === 'text' || !msg.type) {
-    payloadHTML = `<span>${escapeHTML(msg.text || '')}</span>`;
+    const formattedText = parseMentionsAndLinks(msg.text || '');
+    payloadHTML = `<span>${formattedText}</span>`;
+  } else if (msg.type === 'sticker') {
+    payloadHTML = `<div class="sticker-msg-item"><span style="font-size: 52px; display: block;">${msg.fileURL}</span></div>`;
   } else if (msg.type === 'image') {
     payloadHTML = `
-      ${msg.text ? `<div>${escapeHTML(msg.text)}</div>` : ''}
+      ${msg.text ? `<div>${parseMentionsAndLinks(msg.text)}</div>` : ''}
       <div class="image-msg-container">
         <img class="message-image" src="${msg.fileURL}" alt="Rasm" loading="lazy" onclick="openLightbox('${msg.fileURL}', false)">
         <button class="media-view-btn" onclick="openLightbox('${msg.fileURL}', false)" title="Kattalashtirish">
@@ -457,11 +553,12 @@ function renderSingleMessageBubble(msg) {
         <div class="round-video-time">00:00</div>
       </div>`;
   } else if (msg.type === 'document') {
+    const extIcon = getFileIcon(msg.fileName);
     payloadHTML = `<a class="file-attachment" href="${msg.fileURL}" target="_blank">
-      <i class="fa-solid fa-file-arrow-down file-icon"></i>
+      <i class="fa-solid ${extIcon} file-icon"></i>
       <div class="file-info">
         <div class="file-name">${escapeHTML(msg.fileName || 'Fayl')}</div>
-        <div class="file-size">${formatBytes(msg.fileSize || 0)}</div>
+        <div class="file-size">${formatBytes(msg.fileSize || 0)} • Yuklab olish</div>
       </div>
     </a>`;
   } else if (msg.type === 'voice') {
@@ -507,7 +604,6 @@ function renderSingleMessageBubble(msg) {
     openMessageContextMenu(e, msg);
   });
 
-  // Telegram shortcut: Double-click message to reply
   wrapper.addEventListener('dblclick', (e) => {
     e.preventDefault();
     replyingMessage = msg;
@@ -521,6 +617,23 @@ function renderSingleMessageBubble(msg) {
   });
 
   messagesContainer.appendChild(wrapper);
+}
+
+function parseMentionsAndLinks(text) {
+  let str = escapeHTML(text);
+  // @username mention highlight
+  str = str.replace(/@([a-zA-Z0-9_]{3,20})/g, '<span class="mention-tag" onclick="window.viewUserProfile(\'$1\')">@$1</span>');
+  return str;
+}
+
+function getFileIcon(filename = '') {
+  const ext = filename.split('.').pop().toLowerCase();
+  if (['pdf'].includes(ext)) return 'fa-file-pdf';
+  if (['zip', 'rar', '7z', 'tar'].includes(ext)) return 'fa-file-zipper';
+  if (['doc', 'docx'].includes(ext)) return 'fa-file-word';
+  if (['xls', 'xlsx'].includes(ext)) return 'fa-file-excel';
+  if (['mp3', 'wav', 'ogg'].includes(ext)) return 'fa-file-audio';
+  return 'fa-file-arrow-down';
 }
 
 // ─── Voice Playback ───────────────────────────────────────────────────────────
@@ -627,7 +740,7 @@ document.addEventListener('click', () => {
   if (menu) menu.style.display = 'none';
 });
 
-// ─── Context Menu Actions ─────────────────────────────────────────────────────
+// Context Menu Actions
 document.getElementById('ctx-reply')?.addEventListener('click', () => {
   if (!targetContextMessage) return;
   replyingMessage = targetContextMessage;
@@ -641,7 +754,27 @@ document.getElementById('ctx-reply')?.addEventListener('click', () => {
 });
 
 document.getElementById('ctx-copy')?.addEventListener('click', () => {
-  if (targetContextMessage?.text) navigator.clipboard.writeText(targetContextMessage.text).catch(() => {});
+  if (targetContextMessage?.text) {
+    navigator.clipboard.writeText(targetContextMessage.text).catch(() => {});
+    if (window.showToast) window.showToast("Xabar nusxalandi", "info");
+  }
+});
+
+document.getElementById('ctx-pin')?.addEventListener('click', async () => {
+  if (!targetContextMessage || !activeChatId) return;
+  try {
+    await updateDoc(doc(db, 'chats', activeChatId), {
+      pinnedMessageId: targetContextMessage.id,
+      pinnedMessageText: targetContextMessage.text || targetContextMessage.type
+    }).catch(() => {});
+  } catch (e) {}
+
+  if (activeChatData) {
+    activeChatData.pinnedMessageId = targetContextMessage.id;
+    activeChatData.pinnedMessageText = targetContextMessage.text || targetContextMessage.type;
+    updateChatHeaderUI(activeChatData);
+  }
+  if (window.showToast) window.showToast("Xabar chat yuqorisiga pin qilindi 📌", "success");
 });
 
 document.getElementById('ctx-forward')?.addEventListener('click', async () => {
@@ -652,23 +785,21 @@ document.getElementById('ctx-forward')?.addEventListener('click', async () => {
   container.innerHTML = '';
   modal.classList.add('active');
 
-  try {
-    const snap = await getDocs(query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid)));
-    snap.forEach(docSnap => {
-      const cData = docSnap.data();
-      const item = document.createElement('div');
-      item.className = 'user-select-item';
-      item.innerHTML = `<div style="font-weight:600;">${escapeHTML(cData.groupName || 'Chat')}</div>`;
-      item.addEventListener('click', async () => {
-        await sendMessagePayload(docSnap.id, targetContextMessage.text, targetContextMessage.type, targetContextMessage.fileURL, null, {
-          senderId: targetContextMessage.senderId,
-          senderName: targetContextMessage.senderName
-        });
-        modal.classList.remove('active');
+  const localChats = currentChatsList.length > 0 ? currentChatsList : getLocalChats();
+  localChats.forEach(cData => {
+    const item = document.createElement('div');
+    item.className = 'user-select-item';
+    item.innerHTML = `<div style="font-weight:600;">${escapeHTML(cData.displayTitle || cData.groupName || 'Chat')}</div>`;
+    item.addEventListener('click', async () => {
+      await sendMessagePayload(cData.id, targetContextMessage.text, targetContextMessage.type, targetContextMessage.fileURL, null, {
+        senderId: targetContextMessage.senderId,
+        senderName: targetContextMessage.senderName
       });
-      container.appendChild(item);
+      modal.classList.remove('active');
+      if (window.showToast) window.showToast("Xabar yo'naltirildi", "success");
     });
-  } catch (e) {}
+    container.appendChild(item);
+  });
 });
 
 document.getElementById('ctx-edit')?.addEventListener('click', () => {
@@ -692,15 +823,26 @@ document.getElementById('ctx-delete-for-me')?.addEventListener('click', async ()
   try {
     await updateDoc(doc(db, `chats/${activeChatId}/messages`, targetContextMessage.id), {
       deletedFor: arrayUnion(currentUser.uid)
-    });
+    }).catch(() => {});
   } catch (e) {}
+
+  // Local fallback deletion
+  const msgs = getLocalMessages(activeChatId);
+  const updated = msgs.filter(m => m.id !== targetContextMessage.id);
+  saveLocalMessages(activeChatId, updated);
+  renderLocalFallbackMessages(activeChatId, false);
 });
 
 document.getElementById('ctx-delete-for-everyone')?.addEventListener('click', async () => {
   if (!targetContextMessage || !activeChatId) return;
   try {
-    await deleteDoc(doc(db, `chats/${activeChatId}/messages`, targetContextMessage.id));
+    await deleteDoc(doc(db, `chats/${activeChatId}/messages`, targetContextMessage.id)).catch(() => {});
   } catch (e) {}
+
+  const msgs = getLocalMessages(activeChatId);
+  const updated = msgs.filter(m => m.id !== targetContextMessage.id);
+  saveLocalMessages(activeChatId, updated);
+  renderLocalFallbackMessages(activeChatId, false);
 });
 
 document.getElementById('btn-cancel-reply')?.addEventListener('click', () => {
@@ -728,14 +870,31 @@ window.toggleReaction = async (msgId, emoji) => {
   try {
     const msgRef = doc(db, `chats/${activeChatId}/messages`, msgId);
     const msgSnap = await getDoc(msgRef);
-    if (!msgSnap.exists()) return;
-    const currentUids = msgSnap.data().reactions?.[emoji] || [];
-    if (currentUids.includes(currentUser.uid)) {
-      await updateDoc(msgRef, { [`reactions.${emoji}`]: arrayRemove(currentUser.uid) });
-    } else {
-      await updateDoc(msgRef, { [`reactions.${emoji}`]: arrayUnion(currentUser.uid) });
+    if (msgSnap.exists()) {
+      const currentUids = msgSnap.data().reactions?.[emoji] || [];
+      if (currentUids.includes(currentUser.uid)) {
+        await updateDoc(msgRef, { [`reactions.${emoji}`]: arrayRemove(currentUser.uid) });
+      } else {
+        await updateDoc(msgRef, { [`reactions.${emoji}`]: arrayUnion(currentUser.uid) });
+      }
+      return;
     }
   } catch (e) {}
+
+  // Fallback reaction update
+  const msgs = getLocalMessages(activeChatId);
+  const target = msgs.find(m => m.id === msgId);
+  if (target) {
+    if (!target.reactions) target.reactions = {};
+    if (!target.reactions[emoji]) target.reactions[emoji] = [];
+    if (target.reactions[emoji].includes(currentUser.uid)) {
+      target.reactions[emoji] = target.reactions[emoji].filter(u => u !== currentUser.uid);
+    } else {
+      target.reactions[emoji].push(currentUser.uid);
+    }
+    saveLocalMessages(activeChatId, msgs);
+    renderLocalFallbackMessages(activeChatId, false);
+  }
 };
 
 // ─── Send Message ─────────────────────────────────────────────────────────────
@@ -743,21 +902,24 @@ export async function sendMessagePayload(chatId, text, type = 'text', fileURL = 
   await authReady;
   if (!chatId || !currentUser) return;
 
-  const chatRef = doc(db, 'chats', chatId);
-
   // Edit mode
   if (editingMessageId) {
     try {
-      await updateDoc(doc(db, `chats/${chatId}/messages`, editingMessageId), {
-        text: text, isEdited: true
-      });
+      await updateDoc(doc(db, `chats/${chatId}/messages`, editingMessageId), { text, isEdited: true }).catch(() => {});
     } catch (e) {}
+
+    const msgs = getLocalMessages(chatId);
+    const target = msgs.find(m => m.id === editingMessageId);
+    if (target) { target.text = text; target.isEdited = true; saveLocalMessages(chatId, msgs); }
+
     editingMessageId = null;
     document.getElementById('reply-preview-bar')?.style && (document.getElementById('reply-preview-bar').style.display = 'none');
+    renderLocalFallbackMessages(chatId, false);
     return;
   }
 
   const msgData = {
+    id: `msg_${Date.now()}`,
     chatId,
     senderId: currentUser.uid,
     senderName: userDocData?.displayName || currentUser.displayName || 'Foydalanuvchi',
@@ -770,7 +932,7 @@ export async function sendMessagePayload(chatId, text, type = 'text', fileURL = 
     seenBy: [currentUser.uid],
     deletedFor: [],
     isEdited: false,
-    createdAt: serverTimestamp()
+    createdAt: Date.now()
   };
 
   if (replyingMessage) {
@@ -785,33 +947,31 @@ export async function sendMessagePayload(chatId, text, type = 'text', fileURL = 
 
   if (forwardFrom) msgData.forwardFrom = forwardFrom;
 
-  try {
-    await addDoc(collection(db, `chats/${chatId}/messages`), msgData);
+  // Always save to local storage for zero-error responsiveness
+  const msgs = getLocalMessages(chatId);
+  msgs.push(msgData);
+  saveLocalMessages(chatId, msgs);
 
-    // Update chat meta + unread
-    const chatSnap = await getDoc(chatRef);
-    if (chatSnap.exists()) {
-      const cData = chatSnap.data();
-      const updatePayload = {
-        updatedAt: serverTimestamp(),
-        lastMessage: {
-          text: type === 'text' ? (text || '') : `[${type}]`,
-          senderId: currentUser.uid,
-          createdAt: new Date(),
-          type
-        }
-      };
-      (cData.participants || []).forEach(uid => {
-        if (uid !== currentUser.uid) {
-          updatePayload[`unreadCount.${uid}`] = (cData.unreadCount?.[uid] || 0) + 1;
-        }
-      });
-      await updateDoc(chatRef, updatePayload);
-    }
-    playNotificationSound('outgoing');
-  } catch (e) {
-    console.error('Message send error:', e);
-  }
+  // Sync with Firestore if connected
+  try {
+    await addDoc(collection(db, `chats/${chatId}/messages`), {
+      ...msgData,
+      createdAt: serverTimestamp()
+    }).catch(() => {});
+
+    await updateDoc(doc(db, 'chats', chatId), {
+      updatedAt: serverTimestamp(),
+      lastMessage: {
+        text: type === 'text' ? (text || '') : `[${type}]`,
+        senderId: currentUser.uid,
+        createdAt: new Date(),
+        type
+      }
+    }).catch(() => {});
+  } catch (e) {}
+
+  playNotificationSound('outgoing');
+  renderLocalFallbackMessages(chatId, false);
 }
 
 // ─── Input Handler ────────────────────────────────────────────────────────────
@@ -865,13 +1025,12 @@ sendMsgBtn?.addEventListener('click', async () => {
   }
 });
 
-// ─── File Upload (Images, Videos, Voice, Krujochek, Docs) ──────────────────────
+// ─── File Upload Handler ──────────────────────────────────────────────────────
 export async function handleFileUpload(file, type) {
   if (!activeChatId || !file || !currentUser) return;
 
   let uploadFile = file;
 
-  // Fast client-side image compression for chat images
   if (type === 'image' && file.size > 200 * 1024) {
     try {
       const compressed = await compressImage(file, 1280, 1280, 0.82);
@@ -882,30 +1041,45 @@ export async function handleFileUpload(file, type) {
   const progressContainer = document.getElementById('upload-progress-container');
   const progressFill = document.getElementById('upload-progress-fill');
   if (progressContainer) progressContainer.style.display = 'block';
-  if (progressFill) progressFill.style.width = '0%';
+  if (progressFill) progressFill.style.width = '20%';
 
-  const fileRef = ref(storage, `chat_files/${activeChatId}/${Date.now()}_${uploadFile.name}`);
-  const uploadTask = uploadBytesResumable(fileRef, uploadFile);
+  try {
+    const fileRef = ref(storage, `chat_files/${activeChatId}/${Date.now()}_${uploadFile.name}`);
+    const uploadTask = uploadBytesResumable(fileRef, uploadFile);
 
-  uploadTask.on('state_changed',
-    (snap) => {
-      const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
-      if (progressFill) progressFill.style.width = `${pct}%`;
-    },
-    (err) => {
-      alert("Fayl yuklashda xatolik: " + err.message);
-      if (progressContainer) progressContainer.style.display = 'none';
-    },
-    async () => {
-      const url = await getDownloadURL(uploadTask.ref);
-      const label = type === 'round_video' ? 'Dumaloq video' : uploadFile.name;
-      await sendMessagePayload(activeChatId, label, type, url, { name: uploadFile.name, size: uploadFile.size });
-      if (progressContainer) progressContainer.style.display = 'none';
-    }
-  );
+    uploadTask.on('state_changed',
+      (snap) => {
+        const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
+        if (progressFill) progressFill.style.width = `${pct}%`;
+      },
+      (err) => {
+        useLocalDataUrlFileUpload(uploadFile, type);
+      },
+      async () => {
+        const url = await getDownloadURL(uploadTask.ref);
+        const label = type === 'round_video' ? 'Dumaloq video' : uploadFile.name;
+        await sendMessagePayload(activeChatId, label, type, url, { name: uploadFile.name, size: uploadFile.size });
+        if (progressContainer) progressContainer.style.display = 'none';
+      }
+    );
+  } catch (e) {
+    useLocalDataUrlFileUpload(uploadFile, type);
+  }
 }
 
-// ─── Drag & Drop Support ──────────────────────────────────────────────────────
+function useLocalDataUrlFileUpload(file, type) {
+  const progressContainer = document.getElementById('upload-progress-container');
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    const dataUrl = evt.target.result;
+    const label = type === 'round_video' ? 'Dumaloq video' : file.name;
+    await sendMessagePayload(activeChatId, label, type, dataUrl, { name: file.name, size: file.size });
+    if (progressContainer) progressContainer.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag & Drop
 if (messagesContainer) {
   messagesContainer.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -929,7 +1103,7 @@ if (messagesContainer) {
   });
 }
 
-// ─── Scroll to Bottom Button ──────────────────────────────────────────────────
+// Scroll to bottom button
 const scrollBottomBtn = document.getElementById('btn-scroll-bottom');
 if (messagesContainer && scrollBottomBtn) {
   messagesContainer.addEventListener('scroll', () => {
@@ -942,7 +1116,6 @@ if (messagesContainer && scrollBottomBtn) {
   });
 }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHTML(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

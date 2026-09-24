@@ -18,7 +18,9 @@ import {
   uploadBytesResumable,
   getDownloadURL
 } from './firebase.js';
+
 import { currentUser } from './auth.js';
+import { getLocalUsers, getLocalChats, saveLocalChats } from './store.js';
 
 let selectedGroupMembers = new Set();
 
@@ -30,13 +32,21 @@ export async function loadGroupMemberSelectionList() {
   container.innerHTML = '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding:10px;">Foydalanuvchilar yuklanmoqda...</div>';
 
   try {
-    const usersSnap = await getDocs(collection(db, 'users'));
+    let usersList = [];
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      usersSnap.forEach(uDoc => usersList.push(uDoc.data()));
+    } catch (e) {}
+
+    if (usersList.length === 0) {
+      usersList = getLocalUsers();
+    }
+
     container.innerHTML = '';
     selectedGroupMembers.clear();
 
-    usersSnap.forEach((userDoc) => {
-      const uData = userDoc.data();
-      if (uData.uid === currentUser.uid) return; // Skip self
+    usersList.forEach((uData) => {
+      if (uData.uid === currentUser.uid) return;
 
       const item = document.createElement('div');
       item.className = 'user-select-item';
@@ -96,7 +106,7 @@ if (submitCreateGroupBtn) {
     const avatarFile = groupAvatarInput ? groupAvatarInput.files[0] : null;
 
     if (!groupName) {
-      alert("Iltimos, guruh nomini kiriting!");
+      if (window.showToast) window.showToast("Iltimos, guruh nomini kiriting!", "warning");
       return;
     }
 
@@ -106,9 +116,13 @@ if (submitCreateGroupBtn) {
     try {
       let groupAvatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(groupName)}`;
       if (avatarFile) {
-        const storageRef = ref(storage, `group_avatars/${Date.now()}_${avatarFile.name}`);
-        const uploadTask = await uploadBytesResumable(storageRef, avatarFile);
-        groupAvatar = await getDownloadURL(uploadTask.ref);
+        try {
+          const storageRef = ref(storage, `group_avatars/${Date.now()}_${avatarFile.name}`);
+          const uploadTask = await uploadBytesResumable(storageRef, avatarFile);
+          groupAvatar = await getDownloadURL(uploadTask.ref);
+        } catch (e) {
+          groupAvatar = document.getElementById('group-avatar-preview')?.src || groupAvatar;
+        }
       }
 
       const participants = [currentUser.uid, ...Array.from(selectedGroupMembers)];
@@ -119,7 +133,9 @@ if (submitCreateGroupBtn) {
         typing[uid] = false;
       });
 
-      const newGroupRef = await addDoc(collection(db, 'chats'), {
+      const newGroupId = `group_${Date.now()}`;
+      const newGroupObj = {
+        id: newGroupId,
         type: 'group',
         groupName: groupName,
         groupAvatar: groupAvatar,
@@ -129,24 +145,40 @@ if (submitCreateGroupBtn) {
         participants: participants,
         unreadCount: unreadCount,
         typing: typing,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         lastMessage: {
           text: `Guruh "${groupName}" yaratildi`,
           senderId: currentUser.uid,
-          createdAt: new Date(),
+          createdAt: Date.now(),
           type: 'text'
         }
-      });
+      };
 
-      document.getElementById('modal-new-group').classList.remove('active');
+      // Save locally
+      const localChats = getLocalChats();
+      localChats.unshift(newGroupObj);
+      saveLocalChats(localChats);
+
+      // Try syncing to Firebase Firestore
+      try {
+        await addDoc(collection(db, 'chats'), {
+          ...newGroupObj,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }).catch(() => {});
+      } catch (e) {}
+
+      document.getElementById('modal-new-group')?.classList.remove('active');
       document.getElementById('group-name-input').value = '';
       document.getElementById('group-desc-input').value = '';
 
-      // Open newly created group chat
+      if (window.showToast) window.showToast(`"${groupName}" guruhi yaratildi! 🎉`, "success");
+
       if (window.openChatById) {
-        window.openChatById(newGroupRef.id);
+        window.openChatById(newGroupId, newGroupObj);
       }
+      if (window.refreshChatListView) window.refreshChatListView();
     } catch (err) {
       alert("Guruh yaratishda xatolik: " + err.message);
     } finally {
@@ -158,25 +190,54 @@ if (submitCreateGroupBtn) {
 
 // Group Admin & Member Actions
 export async function promoteToAdmin(chatId, targetUid) {
-  const chatRef = doc(db, 'chats', chatId);
-  await updateDoc(chatRef, {
-    admins: arrayUnion(targetUid)
-  });
+  try {
+    const chatRef = doc(db, 'chats', chatId);
+    await updateDoc(chatRef, { admins: arrayUnion(targetUid) }).catch(() => {});
+  } catch (e) {}
+
+  const chats = getLocalChats();
+  const found = chats.find(c => c.id === chatId);
+  if (found) {
+    if (!found.admins.includes(targetUid)) found.admins.push(targetUid);
+    saveLocalChats(chats);
+  }
 }
 
 export async function removeMemberFromGroup(chatId, targetUid) {
-  const chatRef = doc(db, 'chats', chatId);
-  await updateDoc(chatRef, {
-    participants: arrayRemove(targetUid),
-    admins: arrayRemove(targetUid)
-  });
+  try {
+    const chatRef = doc(db, 'chats', chatId);
+    await updateDoc(chatRef, {
+      participants: arrayRemove(targetUid),
+      admins: arrayRemove(targetUid)
+    }).catch(() => {});
+  } catch (e) {}
+
+  const chats = getLocalChats();
+  const found = chats.find(c => c.id === chatId);
+  if (found) {
+    found.participants = (found.participants || []).filter(u => u !== targetUid);
+    found.admins = (found.admins || []).filter(u => u !== targetUid);
+    saveLocalChats(chats);
+  }
+  if (window.showToast) window.showToast("A'zo guruhdan chiqarildi", "info");
 }
 
 export async function leaveGroup(chatId) {
   if (!currentUser) return;
-  const chatRef = doc(db, 'chats', chatId);
-  await updateDoc(chatRef, {
-    participants: arrayRemove(currentUser.uid),
-    admins: arrayRemove(currentUser.uid)
-  });
+  try {
+    const chatRef = doc(db, 'chats', chatId);
+    await updateDoc(chatRef, {
+      participants: arrayRemove(currentUser.uid),
+      admins: arrayRemove(currentUser.uid)
+    }).catch(() => {});
+  } catch (e) {}
+
+  const chats = getLocalChats();
+  const found = chats.find(c => c.id === chatId);
+  if (found) {
+    found.participants = (found.participants || []).filter(u => u !== currentUser.uid);
+    found.admins = (found.admins || []).filter(u => u !== currentUser.uid);
+    saveLocalChats(chats);
+  }
+  if (window.showToast) window.showToast("Guruhdan chiqdingiz", "info");
 }

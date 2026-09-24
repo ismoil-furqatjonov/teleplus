@@ -3,6 +3,10 @@ import { authReady, currentUser, userDocData } from './auth.js';
 import { initTheme } from './profile.js';
 import { initChatListStream, openChatById, handleFileUpload, sendMessagePayload } from './chat.js';
 import { loadGroupMemberSelectionList } from './group.js';
+import { initStoriesBar } from './story.js';
+import { initSettingsModule } from './settings.js';
+import { getLocalUsers } from './store.js';
+
 import {
   db, storage, collection, query, where, getDocs, getDoc, addDoc, doc,
   updateDoc, serverTimestamp, ref, uploadBytesResumable, getDownloadURL
@@ -27,63 +31,32 @@ window.onTelePulseAuthReady = async (user, userData) => {
 
   initTheme(userData.theme);
   initEmojiGrid();
+  initStoriesBar();
+  initSettingsModule();
+  initGlobalSearchInput();
   await initChatListStream(user, userData);
 };
 
-// ─── Rich Telegram Emoji Categories & Picker ────────────────────────────────
+// ─── Rich Telegram Emoji Categories & Stickers ────────────────────────────────
 const EMOJI_CATEGORIES = {
   smileys: [
     '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
     '😘', '😗', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐',
     '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢',
     '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕', '😟', '🙁',
-    '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞',
-    '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '💩', '🤡', '👻', '👽', '🤖', '🎃'
+    '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞'
   ],
   gestures: [
     '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉',
     '👆', '🖕', '👇', '☝️', '🫵', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🫶', '👐', '🤲',
-    '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁',
-    '🦷', '🦴', '👀', '👁️', '👅', '👄', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '🧓', '👴'
+    '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁'
   ],
   hearts: [
     '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗',
-    '💖', '💘', '💝', '💟', '💯', '🔥', '💥', '✨', '⭐', '🌟', '💫', '⚡', '💢', '💤', '💨', '🕳️',
-    '🎉', '🎊', '🎁', '🎈', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '💎', '👑', '🔮', '🧿'
+    '💖', '💘', '💝', '💟', '💯', '🔥', '💥', '✨', '⭐', '🌟', '💫', '⚡', '💢', '💤', '💨', '🕳️'
   ],
-  animals: [
-    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐻‍❄️', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵',
-    '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗',
-    '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🦟', '🦗', '🕷️', '🦂',
-    '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋',
-    '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🐃', '🐂',
-    '🐎', '🐖', '🐏', '🐑', '🐐', '🦌', '🐕', '🐩', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊️'
-  ],
-  food: [
-    '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥',
-    '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠',
-    '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🌭',
-    '🍔', '🍟', '🍕', '🫓', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜',
-    '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🧁', '🍰', '🎂', '🍮', '🍭',
-    '🍬', '🍫', '🍿', '🍩', '🍪', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧃', '🧉', '🍾', '☕'
-  ],
-  activities: [
-    '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍',
-    '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌',
-    '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '⛹️', '🤺', '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽',
-    '🚣', '🧗', '🚵', '🚴', '🎯', '🎳', '🎮', '🎰', '🧩', '🎲', '♟️', '🎨', '🎬', '🎤', '🎧', '🎼'
-  ],
-  travel: [
-    '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🛴', '🚲',
-    '🛵', '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟', '🚃', '🚋', '🚞', '🚝', '🚄',
-    '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '🚀', '🛸', '🚁', '🛶', '⛵',
-    '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓', '🛟', '🚧', '⛽', '🚏', '🚥', '🚦', '🗿', '🗽', '🗼', '🏰'
-  ],
-  objects: [
-    '💻', '🖥️', '🖨️', '⌨️', '🖱️', '💽', '💾', '💿', '📀', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞',
-    '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋',
-    '🔌', '💡', '🔦', '🕯️', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️',
-    '🧰', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪓', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨'
+  stickers: [
+    '🐱', '🚀', '🔥', '🎉', '💎', '👑', '💖', '🐶', '🦄', '⭐', '⚡', '🤖', '👻', '🍕', '🏆', '🎯'
   ]
 };
 
@@ -93,14 +66,30 @@ function renderEmojiList(category = 'smileys', filterQuery = '') {
   const grid = document.getElementById('emoji-grid');
   if (!grid) return;
 
+  if (category === 'stickers') {
+    grid.innerHTML = '';
+    const stickerList = EMOJI_CATEGORIES.stickers;
+    stickerList.forEach(stickerEmoji => {
+      const card = document.createElement('div');
+      card.className = 'sticker-picker-card';
+      card.innerHTML = `<span style="font-size: 38px;">${stickerEmoji}</span>`;
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (window.activeChatData) {
+          sendMessagePayload(window.activeChatData.id, 'Sticker', 'sticker', stickerEmoji);
+          document.getElementById('emoji-popover')?.classList.remove('active');
+        } else {
+          showToast("Sticker yuborish uchun avval biror chatni tanlang!", "warning");
+        }
+      });
+      grid.appendChild(card);
+    });
+    return;
+  }
+
   let emojiList = [];
   if (filterQuery.trim()) {
-    const q = filterQuery.trim();
-    // Search all categories
-    Object.values(EMOJI_CATEGORIES).forEach(arr => {
-      emojiList.push(...arr);
-    });
-    // Deduplicate
+    Object.values(EMOJI_CATEGORIES).forEach(arr => emojiList.push(...arr));
     emojiList = [...new Set(emojiList)];
   } else {
     emojiList = EMOJI_CATEGORIES[category] || EMOJI_CATEGORIES.smileys;
@@ -127,7 +116,6 @@ function renderEmojiList(category = 'smileys', filterQuery = '') {
 function initEmojiGrid() {
   renderEmojiList(currentEmojiCategory);
 
-  // Tab click events
   document.querySelectorAll('.emoji-tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -140,7 +128,6 @@ function initEmojiGrid() {
     });
   });
 
-  // Search input event
   const searchInput = document.getElementById('emoji-search-input');
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
@@ -148,6 +135,32 @@ function initEmojiGrid() {
     });
     searchInput.addEventListener('click', (e) => e.stopPropagation());
   }
+}
+
+// ─── Global Search Box with Clear Button & Debounce ──────────────────────────
+function initGlobalSearchInput() {
+  const searchInput = document.getElementById('global-search-input');
+  const clearBtn = document.getElementById('btn-clear-search');
+  if (!searchInput) return;
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      clearBtn.style.display = 'none';
+      if (window.refreshChatListView) window.refreshChatListView();
+    });
+  }
+
+  let debounceTimer;
+  searchInput.addEventListener('input', (e) => {
+    const val = e.target.value;
+    if (clearBtn) clearBtn.style.display = val.length > 0 ? 'block' : 'none';
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      if (window.refreshChatListView) window.refreshChatListView();
+    }, 200);
+  });
 }
 
 // ─── Popover Toggles ──────────────────────────────────────────────────────────
@@ -192,17 +205,15 @@ const voiceBar = document.getElementById('voice-recorder-bar');
 const recordingTimerEl = document.getElementById('recording-timer');
 
 micBtn?.addEventListener('click', async () => {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    alert("Brauzeringiz ovoz yozishni qo'llab-quvvatlamaydi!"); return;
-  }
   if (!window.activeChatData) {
     showToast("Ovoz yozish uchun avval biror chatni tanlang!", "warning");
     return;
   }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showToast("Brauzeringiz ovoz yozishni qo'llab-quvvatlamaydi!", "error"); return;
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    // Cross-browser audio MIME detection (Chrome, Firefox, Safari iOS)
     const audioMimes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
     let chosenMime = audioMimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
 
@@ -213,7 +224,6 @@ micBtn?.addEventListener('click', async () => {
       if (e.data && e.data.size > 0) audioChunks.push(e.data);
     };
 
-    // 100ms timeslice ensures continuous data buffering
     mediaRecorder.start(100);
 
     if (voiceBar) voiceBar.style.display = 'flex';
@@ -230,7 +240,7 @@ micBtn?.addEventListener('click', async () => {
       if (recordingTimerEl) recordingTimerEl.textContent = `${m}:${s}`;
     }, 1000);
   } catch (err) {
-    alert("Mikrofondan foydalanishga ruxsat berilmadi: " + err.message);
+    showToast("Mikrofondan foydalanishga ruxsat berilmadi: " + err.message, "error");
   }
 });
 
@@ -257,9 +267,7 @@ function stopVoice(shouldSend) {
     mediaRecorder.stream.getTracks().forEach(t => t.stop());
   };
 
-  try {
-    mediaRecorder.requestData();
-  } catch (e) { }
+  try { mediaRecorder.requestData(); } catch (e) { }
   mediaRecorder.stop();
 }
 
@@ -286,11 +294,7 @@ async function startRoundCamera(facing = 'user') {
   }
   const constraints = {
     audio: true,
-    video: {
-      facingMode: facing,
-      width: { ideal: 480 },
-      height: { ideal: 480 }
-    }
+    video: { facingMode: facing, width: { ideal: 480 }, height: { ideal: 480 } }
   };
   roundVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
   if (roundVideoPreview) {
@@ -302,28 +306,26 @@ async function startRoundCamera(facing = 'user') {
 }
 
 roundVideoBtn?.addEventListener('click', async () => {
+  if (!window.activeChatData) {
+    showToast("Dumaloq video yuborish uchun avval chatni tanlang!", "warning");
+    return;
+  }
   if (!navigator.mediaDevices?.getUserMedia) {
-    alert("Brauzeringiz kameradan foydalanishni qo'llab-quvvatlamaydi!");
+    showToast("Kameradan foydalanish imkoniyati yo'q!", "error");
     return;
   }
   try {
     const stream = await startRoundCamera(currentCameraFacing);
     if (roundVideoModal) roundVideoModal.style.display = 'flex';
 
-    // Pick best supported MIME
     const mimeTypes = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
     let chosenMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
 
     roundVideoChunks = [];
     roundVideoRecorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
-
-    roundVideoRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) roundVideoChunks.push(e.data);
-    };
-
+    roundVideoRecorder.ondataavailable = (e) => { if (e.data.size > 0) roundVideoChunks.push(e.data); };
     roundVideoRecorder.start(100);
 
-    // Reset timer & SVG progress
     roundVideoSeconds = 0;
     if (roundVideoTimerEl) roundVideoTimerEl.textContent = '00:00';
     if (roundRingProgress) roundRingProgress.style.strokeDashoffset = '289';
@@ -335,28 +337,22 @@ roundVideoBtn?.addEventListener('click', async () => {
       const s = String(roundVideoSeconds % 60).padStart(2, '0');
       if (roundVideoTimerEl) roundVideoTimerEl.textContent = `${m}:${s}`;
 
-      // Max 60 seconds
       const maxSec = 60;
       const progress = Math.min(1, roundVideoSeconds / maxSec);
       if (roundRingProgress) {
         roundRingProgress.style.strokeDashoffset = `${289 - (289 * progress)}`;
       }
-
-      if (roundVideoSeconds >= maxSec) {
-        stopRoundVideo(true);
-      }
+      if (roundVideoSeconds >= maxSec) stopRoundVideo(true);
     }, 1000);
 
   } catch (err) {
-    alert("Kameraga ulanishda xatolik: " + err.message);
+    showToast("Kameraga ulanishda xatolik: " + err.message, "error");
   }
 });
 
 switchCamBtn?.addEventListener('click', async () => {
   currentCameraFacing = currentCameraFacing === 'user' ? 'environment' : 'user';
-  try {
-    await startRoundCamera(currentCameraFacing);
-  } catch (e) { }
+  try { await startRoundCamera(currentCameraFacing); } catch (e) { }
 });
 
 sendRoundVideoBtn?.addEventListener('click', () => stopRoundVideo(true));
@@ -399,86 +395,44 @@ document.getElementById('search-username-input')?.addEventListener('input', asyn
 
   if (queryText.length < 1) { resultEl.innerHTML = ''; return; }
 
-  await authReady;
-  if (!currentUser) return;
+  const localUsers = getLocalUsers();
+  const filtered = localUsers.filter(u => u.username.toLowerCase().includes(queryText) || u.displayName.toLowerCase().includes(queryText));
 
-  try {
-    const q = query(
-      collection(db, 'users'),
-      where('username', '>=', queryText),
-      where('username', '<=', queryText + '\uf8ff')
-    );
-    const snap = await getDocs(q);
-    resultEl.innerHTML = '';
-
-    if (snap.empty) {
-      resultEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:10px;">Topilmadi</div>';
-      return;
-    }
-
-    snap.forEach(docSnap => {
-      const uData = docSnap.data();
-      if (uData.uid === currentUser.uid) return;
-
-      const item = document.createElement('div');
-      item.className = 'user-select-item';
-      item.innerHTML = `
-        <img class="user-avatar" style="width:36px;height:36px;" src="${uData.photoURL || ''}" alt="">
-        <div style="flex:1;">
-          <div style="font-weight:600;font-size:14px;">${uData.displayName || ''}</div>
-          <div style="font-size:12px;color:var(--text-muted);">@${uData.username || ''}</div>
-        </div>`;
-
-      item.addEventListener('click', async () => {
-        await startOrOpenPrivateChat(uData);
-        document.getElementById('modal-new-chat')?.classList.remove('active');
-      });
-      resultEl.appendChild(item);
-    });
-  } catch (err) {
-    console.error('User search error:', err);
+  resultEl.innerHTML = '';
+  if (filtered.length === 0) {
+    resultEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:10px;">Topilmadi</div>';
+    return;
   }
+
+  filtered.forEach(uData => {
+    if (currentUser && uData.uid === currentUser.uid) return;
+
+    const item = document.createElement('div');
+    item.className = 'user-select-item';
+    item.innerHTML = `
+      <img class="user-avatar" style="width:36px;height:36px;" src="${uData.photoURL || ''}" alt="">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:14px;">${uData.displayName || ''}</div>
+        <div style="font-size:12px;color:var(--text-muted);">@${uData.username || ''}</div>
+      </div>`;
+
+    item.addEventListener('click', async () => {
+      await startOrOpenPrivateChat(uData);
+      document.getElementById('modal-new-chat')?.classList.remove('active');
+    });
+    resultEl.appendChild(item);
+  });
 });
 
 async function startOrOpenPrivateChat(targetUser) {
   await authReady;
   if (!currentUser) return;
 
-  try {
-    const q = query(
-      collection(db, 'chats'),
-      where('type', '==', 'private'),
-      where('participants', 'array-contains', currentUser.uid)
-    );
-    const snap = await getDocs(q);
-    let existingId = null;
-
-    snap.forEach(docSnap => {
-      if ((docSnap.data().participants || []).includes(targetUser.uid)) {
-        existingId = docSnap.id;
-      }
-    });
-
-    if (existingId) {
-      openChatById(existingId);
-    } else {
-      const ref = await addDoc(collection(db, 'chats'), {
-        type: 'private',
-        participants: [currentUser.uid, targetUser.uid],
-        unreadCount: { [currentUser.uid]: 0, [targetUser.uid]: 0 },
-        typing: { [currentUser.uid]: false, [targetUser.uid]: false },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        lastMessage: null
-      });
-      openChatById(ref.id);
-    }
-  } catch (err) {
-    console.error('Start chat error:', err);
-  }
+  const targetId = `chat_private_${targetUser.uid}`;
+  openChatById(targetId);
 }
 
-// ─── New Group Modal ──────────────────────────────────────────────────────────
+// ─── New Group Modal Trigger ──────────────────────────────────────────────────
 document.getElementById('btn-create-group-instead')?.addEventListener('click', () => {
   document.getElementById('modal-new-chat')?.classList.remove('active');
   document.getElementById('modal-new-group')?.classList.add('active');
@@ -525,15 +479,13 @@ export function showToast(message, type = 'info') {
 }
 window.showToast = showToast;
 
-// ─── Global Escape Key to Close Everything ────────────────────────────────────
+// ─── Escape Key Handler ───────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
     document.querySelectorAll('.popover-menu.active').forEach(p => p.classList.remove('active'));
     const rModal = document.getElementById('round-video-modal');
-    if (rModal && rModal.style.display !== 'none') {
-      stopRoundVideo(false);
-    }
+    if (rModal && rModal.style.display !== 'none') stopRoundVideo(false);
     const ctx = document.getElementById('message-context-menu');
     if (ctx) ctx.style.display = 'none';
     document.getElementById('info-drawer')?.classList.remove('active');
@@ -562,62 +514,55 @@ async function populateInfoDrawer() {
   await authReady;
   if (!currentUser) return;
 
-  try {
-    if (chat.type === 'private') {
-      const otherUid = (chat.participants || []).find(uid => uid !== currentUser.uid);
-      if (!otherUid) return;
-      const uSnap = await getDoc(doc(db, 'users', otherUid));
-      if (!uSnap.exists()) return;
-      const uData = uSnap.data();
-      container.innerHTML = `
-        <img class="user-avatar" style="width:100px;height:100px;" src="${uData.photoURL || ''}" alt="">
-        <h3 style="font-weight:700;">${uData.displayName || ''}</h3>
-        <div style="font-size:13px;color:var(--text-secondary);">@${uData.username || ''}</div>
-        <div class="premium-badge"><i class="fa-solid fa-star"></i> TELEPULSE PREMIUM</div>
-        <div style="width:100%;border-top:1px solid var(--border-color);padding-top:12px;margin-top:10px;">
-          <div style="font-weight:600;font-size:13px;color:var(--text-muted);">BIO</div>
-          <div style="font-size:14px;margin-top:4px;">${uData.bio || 'Mavjud emas'}</div>
-        </div>`;
-    } else {
-      const isAdmin = (chat.admins || []).includes(currentUser.uid);
-      let membersHTML = '<div style="width:100%;"><div style="font-weight:600;font-size:13px;color:var(--text-muted);margin-bottom:8px;">A\'ZOLAR</div>';
-
-      for (const uid of (chat.participants || [])) {
-        try {
-          const uSnap = await getDoc(doc(db, 'users', uid));
-          if (uSnap.exists()) {
-            const uData = uSnap.data();
-            const mAdmin = (chat.admins || []).includes(uid);
-            const mOwner = chat.ownerId === uid;
-            membersHTML += `<div class="user-select-item" style="justify-content:space-between;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <img class="user-avatar" style="width:32px;height:32px;" src="${uData.photoURL || ''}" alt="">
-                <div>
-                  <div style="font-size:13px;font-weight:600;">${uData.displayName || ''}</div>
-                  <div style="font-size:11px;color:var(--text-muted);">@${uData.username || ''}</div>
-                </div>
-              </div>
-              <div>
-                ${mOwner ? '<span class="premium-badge">OWNER</span>' : mAdmin ? '<span class="premium-badge">ADMIN</span>' : ''}
-                ${isAdmin && !mOwner && uid !== currentUser.uid ? `<button onclick="window.kickMember('${chat.id}','${uid}')" style="border:none;background:none;color:var(--danger-color);cursor:pointer;font-size:13px;margin-left:6px;"><i class="fa-solid fa-user-minus"></i></button>` : ''}
-              </div>
-            </div>`;
-          }
-        } catch (e) { }
-      }
-      membersHTML += '</div>';
-
-      container.innerHTML = `
-        <img class="user-avatar" style="width:100px;height:100px;" src="${chat.groupAvatar || ''}" alt="">
-        <h3 style="font-weight:700;">${chat.groupName || 'Guruh'}</h3>
-        <div style="font-size:13px;color:var(--text-secondary);text-align:center;">${chat.groupDescription || ''}</div>
-        ${membersHTML}
-        <button class="btn-secondary" onclick="window.leaveGroupHandler('${chat.id}')" style="width:100%;color:var(--danger-color);margin-top:20px;">
-          <i class="fa-solid fa-right-from-bracket"></i> Guruhdan chiqish
-        </button>`;
+  if (chat.type === 'private') {
+    const otherUid = (chat.participants || []).find(uid => uid !== currentUser.uid);
+    let uData = chat.otherUserData;
+    if (!uData && otherUid) {
+      const localUsers = getLocalUsers();
+      uData = localUsers.find(u => u.uid === otherUid) || localUsers[0];
     }
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger-color);font-size:13px;">Yuklashda xatolik: ${err.message}</div>`;
+    container.innerHTML = `
+      <img class="user-avatar" style="width:100px;height:100px;margin: 0 auto; display: block;" src="${uData?.photoURL || ''}" alt="">
+      <h3 style="font-weight:700; text-align: center; margin-top: 10px;">${uData?.displayName || 'Alisher Navoiy'}</h3>
+      <div style="font-size:13px;color:var(--text-secondary); text-align: center;">@${uData?.username || 'navoiy'}</div>
+      <div class="premium-badge" style="margin: 8px auto; width: fit-content;"><i class="fa-solid fa-star"></i> TELEPULSE PREMIUM</div>
+      <div style="width:100%;border-top:1px solid var(--border-color);padding-top:12px;margin-top:14px;">
+        <div style="font-weight:600;font-size:13px;color:var(--text-muted);">BIO</div>
+        <div style="font-size:14px;margin-top:4px;">${uData?.bio || 'Mavjud emas'}</div>
+      </div>`;
+  } else {
+    const isAdmin = (chat.admins || []).includes(currentUser.uid);
+    let membersHTML = '<div style="width:100%;margin-top:14px;"><div style="font-weight:600;font-size:13px;color:var(--text-muted);margin-bottom:8px;">A\'ZOLAR</div>';
+
+    const localUsers = getLocalUsers();
+    (chat.participants || []).forEach(uid => {
+      const uData = localUsers.find(u => u.uid === uid) || { displayName: 'A\'zo', username: 'member', photoURL: '' };
+      const mAdmin = (chat.admins || []).includes(uid);
+      const mOwner = chat.ownerId === uid;
+      membersHTML += `<div class="user-select-item" style="justify-content:space-between; padding: 6px 0;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <img class="user-avatar" style="width:32px;height:32px;" src="${uData.photoURL || ''}" alt="">
+          <div>
+            <div style="font-size:13px;font-weight:600;">${uData.displayName}</div>
+            <div style="font-size:11px;color:var(--text-muted);">@${uData.username}</div>
+          </div>
+        </div>
+        <div>
+          ${mOwner ? '<span class="premium-badge">OWNER</span>' : mAdmin ? '<span class="premium-badge">ADMIN</span>' : ''}
+          ${isAdmin && !mOwner && uid !== currentUser.uid ? `<button onclick="window.kickMember('${chat.id}','${uid}')" style="border:none;background:none;color:var(--danger-color);cursor:pointer;font-size:13px;margin-left:6px;" title="Chiqarish"><i class="fa-solid fa-user-minus"></i></button>` : ''}
+        </div>
+      </div>`;
+    });
+    membersHTML += '</div>';
+
+    container.innerHTML = `
+      <img class="user-avatar" style="width:100px;height:100px; margin: 0 auto; display: block;" src="${chat.groupAvatar || ''}" alt="">
+      <h3 style="font-weight:700; text-align: center; margin-top: 10px;">${chat.groupName || 'Guruh'}</h3>
+      <div style="font-size:13px;color:var(--text-secondary);text-align:center;">${chat.groupDescription || ''}</div>
+      ${membersHTML}
+      <button class="btn-secondary" onclick="window.leaveGroupHandler('${chat.id}')" style="width:100%;color:var(--danger-color);margin-top:20px;">
+        <i class="fa-solid fa-right-from-bracket"></i> Guruhdan chiqish
+      </button>`;
   }
 }
 
@@ -637,7 +582,7 @@ window.leaveGroupHandler = async (chatId) => {
   document.getElementById('no-chat-view').style.display = 'flex';
 };
 
-// ─── QR Share Modal (Local Wi-Fi Network & Mobile Access) ────────────────────
+// ─── QR Share Modal ───────────────────────────────────────────────────────────
 document.getElementById('share-app-btn')?.addEventListener('click', async () => {
   const modal = document.getElementById('modal-share-app');
   const qrImg = document.getElementById('qr-code-img');
@@ -645,38 +590,19 @@ document.getElementById('share-app-btn')?.addEventListener('click', async () => 
 
   let targetUrl = window.location.origin + window.location.pathname.replace('index.html', 'login.html');
 
-  // If local, fetch server's real local network Wi-Fi IP so phone connects directly!
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'https://telepulce.netlify.app/register  .html') {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     try {
       const res = await fetch('/api/server-info');
       if (res.ok) {
         const info = await res.json();
-        if (info.url) {
-          targetUrl = info.url;
-        }
+        if (info.url) targetUrl = info.url;
       }
     } catch (e) { }
   }
 
-  function setQR(url) {
-    if (urlInput) urlInput.value = url;
-    if (qrImg) qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
-  }
-
-  setQR(targetUrl);
+  if (urlInput) urlInput.value = targetUrl;
+  if (qrImg) qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(targetUrl)}`;
   modal?.classList.add('active');
-
-  // Allow manual edit if user wants custom IP/domain
-  if (urlInput && !urlInput._qrBound) {
-    urlInput._qrBound = true;
-    urlInput.removeAttribute('readonly');
-    urlInput.addEventListener('input', (e) => {
-      const val = e.target.value.trim();
-      if (val && qrImg) {
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(val)}`;
-      }
-    });
-  }
 });
 
 document.getElementById('btn-copy-share-url')?.addEventListener('click', () => {
