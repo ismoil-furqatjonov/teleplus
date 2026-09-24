@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="uz" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Ro'yxatdan o'tish - TelePulse (Telepluce) Chat</title>
-  <meta name="description" content="TelePulse (Telepluce) orqali yangi hisob yarating va bepul real-time chatdan foydalaning.">
-  <meta name="keywords" content="telepluce, telepulse, tele pluce, telepulse register, telepluce royxatdan otish">
+  <title>Ro'yxatdan o'tish - TelePulse Web Messenger</title>
+  <meta name="description" content="TelePulse orqali yangi hisob yarating va bepul real-time messenger imkoniyatlaridan foydalaning.">
+  <meta name="keywords" content="telepulse, telepulse register, royxatdan otish, messenger">
   <meta name="robots" content="index, follow">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -24,10 +24,10 @@
         <i class="fa-solid fa-paper-plane"></i>
       </div>
       <h1 class="auth-title">Ro'yxatdan O'tish</h1>
-      <p class="auth-subtitle">TelePulse'da yangi hisob yarating</p>
+      <p class="auth-subtitle">TelePulse'da yangi profilingizni yarating</p>
     </div>
 
-    <div id="error-alert" style="display: none; background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
+    <div id="error-alert" style="display: none; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
 
     <form id="register-form">
       <!-- Avatar Upload Picker -->
@@ -41,26 +41,31 @@
 
       <div class="form-group">
         <label class="form-label" for="reg-display-name">Ism va Familiya</label>
-        <input type="text" id="reg-display-name" class="form-input" placeholder="Ali Valiyev" required>
+        <input type="text" id="reg-display-name" class="form-input" placeholder="Masalan: Ali Valiyev" required>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="reg-username">Username (Unikal)</label>
         <div style="position: relative;">
-          <span style="position: absolute; left: 14px; top: 12px; color: var(--text-muted);">@</span>
-          <input type="text" id="reg-username" class="form-input" style="padding-left: 30px;" placeholder="alivaliyev" requiredPattern="[a-zA-Z0-9_]{3,20}">
+          <span style="position: absolute; left: 14px; top: 12px; color: var(--text-muted); font-weight: 600;">@</span>
+          <input type="text" id="reg-username" class="form-input" style="padding-left: 30px;" placeholder="alivaliyev" required pattern="[a-zA-Z0-9_]{3,20}">
         </div>
-        <small style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">Kamida 3 ta belgi (lotin harflari, raqam, _)</small>
+        <small style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">Kamida 3 ta belgi (lotin harflari, raqamlar, _)</small>
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="reg-email">Email Manzil</label>
+        <label class="form-label" for="reg-email">Email yoki Telefon</label>
         <input type="email" id="reg-email" class="form-input" placeholder="email@example.com" required>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="reg-password">Parol</label>
         <input type="password" id="reg-password" class="form-input" placeholder="Kamida 6 ta belgi" minlength="6" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="reg-confirm-password">Parolni tasdiqlang</label>
+        <input type="password" id="reg-confirm-password" class="form-input" placeholder="Parolni qayta kiriting" minlength="6" required>
       </div>
 
       <div class="form-group">
@@ -78,6 +83,7 @@
     </div>
   </div>
 
+  <script type="module" src="js/store.js"></script>
   <script type="module" src="js/auth.js"></script>
 </body>
 </html>
