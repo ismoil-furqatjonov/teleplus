@@ -646,7 +646,7 @@ document.getElementById('share-app-btn')?.addEventListener('click', async () => 
   let targetUrl = window.location.origin + window.location.pathname.replace('index.html', 'login.html');
 
   // If local, fetch server's real local network Wi-Fi IP so phone connects directly!
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'https://telepulce.netlify.app/register.html') {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'https://telepulce.netlify.app/register  .html') {
     try {
       const res = await fetch('/api/server-info');
       if (res.ok) {
