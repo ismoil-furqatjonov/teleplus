@@ -24,6 +24,8 @@ import {
 import { authReady, currentUser, userDocData } from './auth.js';
 import { togglePinChat, compressImage } from './profile.js';
 import { promoteToAdmin, removeMemberFromGroup, leaveGroup } from './group.js';
+import { getLocalChats, saveLocalChats, getLocalMessages, saveLocalMessages } from './store.js';
+import { getLocalChats, saveLocalChats, getLocalMessages, saveLocalMessages } from './store.js';
 
 let activeChatId = null;
 let activeChatData = null;
@@ -88,6 +90,8 @@ export async function initChatListStream(user, userData) {
 
   if (chatListUnsubscribe) chatListUnsubscribe();
 
+  try {
+  try {
   const q = query(
     collection(db, 'chats'),
     where('participants', 'array-contains', user.uid)
@@ -120,6 +124,16 @@ export async function initChatListStream(user, userData) {
       }
       chats.push(chat);
     }
+
+      if (chats.length === 0) {
+        loadFallbackChatList(user, userData);
+        return;
+      }
+
+      if (chats.length === 0) {
+        loadFallbackChatList(user, userData);
+        return;
+      }
 
     const pinnedSet = new Set(userData?.pinnedChats || []);
     chats.sort((a, b) => {
