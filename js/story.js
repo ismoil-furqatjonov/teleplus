@@ -1,6 +1,7 @@
 // TelePulse - 24-Hour Stories Management Module
 import { getLocalStories, saveLocalStories } from './store.js';
 import { authReady, currentUser, userDocData } from './auth.js';
+import { validateAndModerateText, validateAndModerateMedia } from './moderation.js';
 
 let activeStoryIndex = 0;
 let currentStoriesList = [];
@@ -157,10 +158,23 @@ if (storyFormBtn) {
     });
   }
 
-  storyFormBtn.addEventListener('click', () => {
+  storyFormBtn.addEventListener('click', async () => {
     const captionInput = document.getElementById('story-caption-input');
     const caption = captionInput ? captionInput.value.trim() : '';
     const file = fileInput ? fileInput.files[0] : null;
+
+    // AI Moderation: Check Caption
+    if (caption) {
+      const capCheck = await validateAndModerateText(caption, currentUser);
+      if (!capCheck.allowed) return;
+    }
+
+    // AI Moderation: Check Media File
+    if (file) {
+      const mediaType = file.type.startsWith('video') ? 'video' : 'image';
+      const fileCheck = await validateAndModerateMedia(file, mediaType, currentUser);
+      if (!fileCheck.allowed) return;
+    }
 
     let mediaUrl = preview && preview.src && preview.style.display !== 'none' ? preview.src : '';
     if (!mediaUrl) {

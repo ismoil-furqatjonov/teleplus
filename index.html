@@ -74,6 +74,9 @@
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
         <input type="text" id="global-search-input" class="search-input" placeholder="Qidiruv (User, Guruh, Xabar)...">
+        <button id="btn-ai-search-toggle" class="btn-ai-search-icon" title="AI aqlli qidiruv">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </button>
         <button id="btn-clear-search" class="btn-clear-search" style="display: none;" title="Tozalash">
           <i class="fa-solid fa-circle-xmark"></i>
         </button>
@@ -95,6 +98,11 @@
       <!-- FLOATING ACTION BUTTON -->
       <button class="fab" id="fab-new-chat" title="Yangi Chat / Guruh">
         <i class="fa-solid fa-pen"></i>
+      </button>
+
+      <!-- AI CHAT BUTTON -->
+      <button class="fab fab-ai" id="fab-ai-chat" title="AI Yordamchi">
+        <i class="fa-solid fa-robot"></i>
       </button>
     </aside>
 
@@ -129,6 +137,9 @@
           </div>
 
           <div class="header-actions">
+            <button class="icon-btn btn-ai-summary-trigger" id="btn-chat-ai-summary" title="AI Chat Xulosasi">
+              <i class="fa-solid fa-brain"></i>
+            </button>
             <button class="icon-btn" id="btn-close-chat" title="Chatni yopish">
               <i class="fa-solid fa-xmark"></i>
             </button>
@@ -195,6 +206,12 @@
           <div class="progress-bar-fill" id="upload-progress-fill"></div>
         </div>
 
+        <!-- SMART REPLY BAR -->
+        <div class="smart-reply-bar" id="smart-reply-bar" style="display:none">
+          <div class="smart-reply-label"><i class="fa-solid fa-robot"></i></div>
+          <div id="smart-reply-container" class="smart-reply-container"></div>
+        </div>
+
         <!-- CHAT INPUT AREA -->
         <footer class="chat-input-area" id="chat-input-area">
           <button class="icon-btn" id="btn-attachment" title="Fayl yuborish">
@@ -216,6 +233,36 @@
                 <i class="fa-solid fa-file" style="color: #10b981;"></i> Hujjat (PDF, DOC, ZIP)
                 <input type="file" id="file-input-doc" accept="*" style="display: none;">
               </label>
+            </div>
+          </div>
+
+          <!-- AI Writer Button & Panel -->
+          <div class="ai-writer-wrapper" style="position:relative;">
+            <button class="icon-btn btn-ai-writer" id="btn-ai-writer" title="AI Yozuvchi" style="color:var(--accent-color);">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </button>
+            <div class="popover-menu ai-writer-panel" id="ai-writer-panel">
+              <div class="ai-writer-header">
+                <i class="fa-solid fa-robot"></i> AI Yozuvchi
+              </div>
+              <div class="ai-writer-custom">
+                <input type="text" id="ai-writer-custom-input" class="form-input" placeholder="Nima yozishni istaysiz?" style="font-size:12px;">
+              </div>
+              <div class="ai-writer-actions">
+                <button class="ai-writer-btn" data-writer-action="write"><i class="fa-solid fa-pen"></i> Yoz</button>
+                <button class="ai-writer-btn" data-writer-action="rewrite"><i class="fa-solid fa-rotate"></i> Qayta yoz</button>
+                <button class="ai-writer-btn" data-writer-action="shorten"><i class="fa-solid fa-compress"></i> Qisqartir</button>
+                <button class="ai-writer-btn" data-writer-action="expand"><i class="fa-solid fa-expand"></i> Kengaytir</button>
+                <button class="ai-writer-btn" data-writer-action="translate"><i class="fa-solid fa-language"></i> Tarjima</button>
+                <button class="ai-writer-btn" data-writer-action="grammar"><i class="fa-solid fa-spell-check"></i> Grammatika</button>
+                <button class="ai-writer-btn" data-writer-action="professional"><i class="fa-solid fa-briefcase"></i> Professional</button>
+              </div>
+              <div class="ai-writer-result" id="ai-writer-result" style="display:none">
+                <div class="ai-writer-result-text"></div>
+                <div class="ai-writer-result-actions">
+                  <button class="btn-primary btn-insert-to-chat" style="font-size:12px;padding:6px 12px;"><i class="fa-solid fa-arrow-turn-down"></i> Chatga qo'shish</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -277,6 +324,44 @@
 
   </div>
 
+  <!-- AI CHAT SIDE PANEL -->
+  <div class="ai-chat-panel" id="ai-chat-panel">
+    <div class="ai-panel-header">
+      <div class="ai-panel-title">
+        <span class="ai-status-dot" id="ai-status-dot"></span>
+        <i class="fa-solid fa-robot"></i> TelePulce AI
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="icon-btn" id="ai-chat-clear" title="Tarixni tozalash"><i class="fa-solid fa-rotate-left"></i></button>
+        <button class="icon-btn" id="btn-close-ai-panel" title="Yopish"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <div class="ai-messages-container" id="ai-messages-container"></div>
+    <div class="ai-panel-input-area">
+      <textarea id="ai-chat-input" class="ai-chat-input" placeholder="AI bilan gaplashing..." rows="1"></textarea>
+      <button class="icon-btn btn-ai-voice-mic" id="btn-ai-chat-voice" title="Ovoz bilan gapirish">
+        <i class="fa-solid fa-microphone"></i>
+      </button>
+      <button class="ai-send-btn" id="ai-chat-send" disabled><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- AI TTS PANEL -->
+  <div class="ai-tts-panel" id="ai-tts-panel" style="display:none">
+    <div class="ai-tts-header">
+      <i class="fa-solid fa-volume-high"></i> Ovoz yaratilmoqda...
+      <button class="icon-btn" id="btn-close-tts" style="margin-left:auto"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="ai-tts-controls">
+      <button id="tts-play-btn" class="tts-control-btn" title="Play/Pause"><i class="fa-solid fa-play"></i></button>
+      <button id="tts-stop-btn" class="tts-control-btn" title="To'xtatish"><i class="fa-solid fa-stop"></i></button>
+      <div class="tts-waveform" id="tts-waveform">
+        <span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+
   <!-- CONTEXT MENU FOR MESSAGES -->
   <div class="context-menu" id="message-context-menu">
     <div class="quick-reactions">
@@ -288,8 +373,11 @@
     </div>
     <div class="context-menu-item" id="ctx-reply"><i class="fa-solid fa-reply"></i> Javob berish</div>
     <div class="context-menu-item" id="ctx-copy"><i class="fa-solid fa-copy"></i> Nusxalash</div>
-    <div class="context-menu-item" id="ctx-pin"><i class="fa-solid fa-thumbtack"></i> Pin qilish (Yuqoriga)</div>
-    <div class="context-menu-item" id="ctx-forward"><i class="fa-solid fa-share"></i> Yo'naltirish (Forward)</div>
+    <div class="context-menu-item" id="ctx-pin"><i class="fa-solid fa-thumbtack"></i> Pin qilish</div>
+    <div class="context-menu-item" id="ctx-forward"><i class="fa-solid fa-share"></i> Yo'naltirish</div>
+    <div class="context-menu-item" id="ctx-tts"><i class="fa-solid fa-volume-high"></i> Ovoz bilan o'qi</div>
+    <div class="context-menu-item" id="ctx-translate"><i class="fa-solid fa-language"></i> AI Tarjima</div>
+    <div class="context-menu-item" id="ctx-summarize"><i class="fa-solid fa-compress"></i> AI Qisqartirish</div>
     <div class="context-menu-item" id="ctx-edit" style="display: none;"><i class="fa-solid fa-pen"></i> Tahrirlash</div>
     <div class="context-menu-item danger" id="ctx-delete-for-me"><i class="fa-solid fa-trash"></i> O'zimdan o'chirish</div>
     <div class="context-menu-item danger" id="ctx-delete-for-everyone" style="display: none;"><i class="fa-solid fa-trash-can"></i> Hamma uchun o'chirish</div>
@@ -310,6 +398,7 @@
           <div class="settings-tab-item" data-section="privacy"><i class="fa-solid fa-lock"></i> Maxfiylik</div>
           <div class="settings-tab-item" data-section="notifications"><i class="fa-solid fa-bell"></i> Bildirishnomalar</div>
           <div class="settings-tab-item" data-section="appearance"><i class="fa-solid fa-palette"></i> Ko'rinish</div>
+          <div class="settings-tab-item" data-section="ai"><i class="fa-solid fa-robot"></i> AI Sozlamalar</div>
           <div class="settings-tab-item" data-section="security"><i class="fa-solid fa-shield-halved"></i> Xavfsizlik</div>
           <div class="settings-tab-item" data-section="about"><i class="fa-solid fa-circle-info"></i> Haqida</div>
         </div>
@@ -368,6 +457,107 @@
               </div>
             </div>
           </div>
+          <!-- AI Settings Panel -->
+          <div class="settings-section-panel" id="settings-sec-ai">
+            <h4 style="margin-bottom:16px;"><i class="fa-solid fa-robot" style="color:var(--accent-color);"></i> AI Funksiyalar</h4>
+            <div class="ai-settings-status" id="ai-settings-status">
+              <div class="ai-status-indicator">
+                <span class="ai-status-dot" id="ai-settings-status-dot"></span>
+                <span id="ai-settings-status-text">AI holati tekshirilmoqda...</span>
+              </div>
+            </div>
+
+            <div class="ai-settings-list">
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-comments"></i> AI Chat</div>
+                  <div class="ai-setting-desc">AI bilan suhbat</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-chat" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Writer</div>
+                  <div class="ai-setting-desc">Matn yozishda yordam</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-writer" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-volume-high"></i> Text-to-Speech</div>
+                  <div class="ai-setting-desc">Matnni ovozga aylantirish</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-tts" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-microphone"></i> Voice Assistant</div>
+                  <div class="ai-setting-desc">Ovoz bilan yozish</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-voice" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-image"></i> Rasm Tahlili</div>
+                  <div class="ai-setting-desc">AI orqali rasm tahlili</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-image" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-language"></i> Tarjima</div>
+                  <div class="ai-setting-desc">AI tarjima xizmati</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-translation" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-reply"></i> Smart Reply</div>
+                  <div class="ai-setting-desc">AI javob takliflari</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-smart-reply" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="ai-setting-row">
+                <div class="ai-setting-info">
+                  <div class="ai-setting-name"><i class="fa-solid fa-list"></i> Chat Xulosa</div>
+                  <div class="ai-setting-desc">Uzun chatlarni qisqartirish</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ai-toggle-summary" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div style="margin-top:20px;padding:12px;background:var(--bg-hover);border-radius:var(--radius-sm);">
+              <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">
+                <i class="fa-solid fa-shield-halved" style="color:var(--accent-color);"></i>
+                <strong>Xavfsizlik:</strong> API kalitlar server tomonda saqlanadi. Frontend kodida ko'rinmaydi.
+              </div>
+            </div>
+          </div>
+
           <!-- Security Panel -->
           <div class="settings-section-panel" id="settings-sec-security">
             <h4>Xavfsizlik & Autentifikatsiya</h4>
@@ -542,8 +732,27 @@
           <input type="text" id="edit-display-name-input" class="form-input" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Bio</label>
-          <input type="text" id="edit-bio-input" class="form-input">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label" style="margin-bottom:0;">Bio</label>
+            <button type="button" class="btn-ai-bio-helper" id="btn-ai-bio-helper" style="background:none;border:none;color:var(--accent-color);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> AI Yordamchi
+            </button>
+          </div>
+          <input type="text" id="edit-bio-input" class="form-input" placeholder="O'zingiz haqingizda qisqacha...">
+          <div id="ai-bio-panel" style="display:none;margin-top:8px;padding:10px;background:var(--bg-hover);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Kasbingiz yoki qiziqishingizni yozing, AI bio yozib beradi:</div>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <input type="text" id="ai-bio-desc-input" class="form-input" placeholder="Masalan: Web dasturchiman, saytlar yarataman" style="font-size:12px;padding:6px 10px;">
+              <button type="button" id="btn-generate-bio" class="btn-primary" style="font-size:12px;padding:6px 12px;white-space:nowrap;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Yaratish
+              </button>
+            </div>
+            <div style="display:flex;gap:6px;" id="ai-bio-style-buttons">
+              <button type="button" class="ai-bio-style-btn active" data-style="professional">Professional</button>
+              <button type="button" class="ai-bio-style-btn" data-style="creative">Ijodiy</button>
+              <button type="button" class="ai-bio-style-btn" data-style="short">Qisqa</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -647,10 +856,75 @@
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- 11. AI SEARCH MODAL -->
+  <div class="modal-overlay" id="modal-ai-search">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-color);"></i> AI Aqlli Qidiruv</div>
+        <button class="icon-btn modal-close" data-modal="modal-ai-search"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+          Tabiiy tilda qidiring (masalan: <em>"Ali menga kecha nima yuborgan?"</em> yoki <em>"uchrashuv haqida"</em>):
+        </p>
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <input type="text" id="ai-search-modal-input" class="form-input" placeholder="Savol yoki qidiruv matni..." style="flex: 1;">
+          <button id="btn-run-ai-search" class="btn-primary" style="white-space: nowrap; padding: 0 16px;">
+            <i class="fa-solid fa-magnifying-glass"></i> Qidirish
+          </button>
+        </div>
+        <div id="ai-search-loading" style="display: none; text-align: center; padding: 20px; color: var(--text-muted);">
+          <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--accent-color); margin-bottom: 8px; display: block;"></i>
+          AI xabarlarni tahlil qilmoqda...
+        </div>
+        <div id="ai-search-results-list" class="ai-search-results-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12. AI CHAT SUMMARY MODAL -->
+  <div class="modal-overlay" id="modal-ai-summary">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-brain" style="color:var(--accent-color);"></i> AI Chat Xulosasi</div>
+        <button class="icon-btn modal-close" data-modal="modal-ai-summary"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="ai-summary-loading" style="display: none; text-align: center; padding: 24px; color: var(--text-muted);">
+          <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--accent-color); margin-bottom: 10px; display: block;"></i>
+          Suhbat tahlil qilinib umumlashtirilmoqda...
+        </div>
+        <div id="ai-summary-content" style="line-height: 1.7; font-size: 13.5px; white-space: pre-wrap;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-ai-summary">Yopish</button>
+        <button class="btn-primary" id="btn-copy-ai-summary"><i class="fa-solid fa-copy"></i> Nusxalash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 13. AI RESULT MODAL -->
+  <div class="modal-overlay" id="modal-ai-result">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title" id="ai-result-modal-title"><i class="fa-solid fa-robot" style="color:var(--accent-color);"></i> AI Natijasi</div>
+        <button class="icon-btn modal-close" data-modal="modal-ai-result"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="ai-result-text" style="line-height: 1.7; font-size: 13.5px; white-space: pre-wrap;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close" data-modal="modal-ai-result">Yopish</button>
+        <button class="btn-primary" id="btn-copy-ai-result"><i class="fa-solid fa-copy"></i> Nusxalash</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SCRIPTS -->
   <script type="module" src="js/firebase.js"></script>
   <script type="module" src="js/store.js"></script>
   <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/ai.js"></script>
   <script type="module" src="js/profile.js"></script>
   <script type="module" src="js/chat.js"></script>
   <script type="module" src="js/group.js"></script>

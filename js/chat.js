@@ -25,9 +25,14 @@ import { authReady, currentUser, userDocData } from './auth.js';
 import { togglePinChat, compressImage } from './profile.js';
 import { promoteToAdmin, removeMemberFromGroup, leaveGroup } from './group.js';
 import { getLocalChats, saveLocalChats, getLocalMessages, saveLocalMessages } from './store.js';
+import { validateAndModerateText, validateAndModerateMedia } from './moderation.js';
+import { showImageAnalysisBtn, loadSmartReplies, textToSpeech, translateText, aiWrite } from './ai.js';
 
 let activeChatId = null;
 let activeChatData = null;
+let currentChatsList = [];
+let currentPinnedSet = new Set();
+let currentActiveMessages = [];
 let chatListUnsubscribe = null;
 let messagesUnsubscribe = null;
 let activeChatDocUnsubscribe = null;
@@ -294,6 +299,7 @@ export async function openChatById(chatId, cachedData = null) {
   if (!currentUser) return;
 
   activeChatId = chatId;
+  window.activeChatId = chatId;
   noChatView.style.display = 'none';
   activeChatContainer.style.display = 'flex';
 
@@ -444,6 +450,7 @@ function listenToMessagesStream(chatId) {
         return;
       }
 
+      currentActiveMessages = [];
       snapshot.docs.forEach(docSnap => {
         const msg = { id: docSnap.id, ...docSnap.data() };
         if (msg.deletedFor?.includes(currentUser?.uid)) return;
@@ -454,8 +461,11 @@ function listenToMessagesStream(chatId) {
           }).catch(() => {});
         }
 
+        currentActiveMessages.push(msg);
         renderSingleMessageBubble(msg);
       });
+
+      triggerSmartReply(currentActiveMessages);
 
       if (!firstLoad) playNotificationSound('incoming');
       firstLoad = false;
@@ -469,13 +479,28 @@ function listenToMessagesStream(chatId) {
   }
 }
 
+function triggerSmartReply(messages) {
+  const smartBar = document.getElementById('smart-reply-bar');
+  if (!smartBar) return;
+  const lastInMsg = messages.slice().reverse().find(m => m.senderId !== currentUser?.uid && m.text && (m.type === 'text' || !m.type));
+  if (lastInMsg) {
+    smartBar.style.display = 'flex';
+    loadSmartReplies(lastInMsg);
+  } else {
+    smartBar.style.display = 'none';
+  }
+}
+
 function renderLocalFallbackMessages(chatId, firstLoad) {
   if (!messagesContainer) return;
   messagesContainer.innerHTML = '';
   const msgs = getLocalMessages(chatId);
+  currentActiveMessages = msgs;
 
   if (msgs.length === 0) {
     messagesContainer.innerHTML = `<div class="empty-state-card"><i class="fa-solid fa-paper-plane"></i><span>Hozircha xabarlar yo'q. Birinchi xabarni yuboring!</span></div>`;
+    const smartBar = document.getElementById('smart-reply-bar');
+    if (smartBar) smartBar.style.display = 'none';
     return;
   }
 
@@ -484,6 +509,7 @@ function renderLocalFallbackMessages(chatId, firstLoad) {
     renderSingleMessageBubble(msg);
   });
 
+  triggerSmartReply(msgs);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -617,6 +643,13 @@ function renderSingleMessageBubble(msg) {
   });
 
   messagesContainer.appendChild(wrapper);
+
+  // AI Image Analysis Action Button
+  if (msg.type === 'image' && msg.fileURL) {
+    setTimeout(() => {
+      showImageAnalysisBtn(wrapper, msg.fileURL);
+    }, 0);
+  }
 }
 
 function parseMentionsAndLinks(text) {
@@ -721,18 +754,27 @@ window.openLightbox = (url, isVideo = false) => {
 // ─── Context Menu ─────────────────────────────────────────────────────────────
 function openMessageContextMenu(e, msg) {
   targetContextMessage = msg;
+  window.targetContextMessage = msg;
   const menu = document.getElementById('message-context-menu');
   if (!menu) return;
   menu.style.display = 'block';
-  let x = Math.min(e.clientX, window.innerWidth - 190);
-  let y = Math.min(e.clientY, window.innerHeight - 250);
+  let x = Math.min(e.clientX, window.innerWidth - 220);
+  let y = Math.min(e.clientY, window.innerHeight - 320);
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
   const isMine = msg.senderId === currentUser?.uid;
   const editEl = document.getElementById('ctx-edit');
   const delAllEl = document.getElementById('ctx-delete-for-everyone');
+  const ttsEl = document.getElementById('ctx-tts');
+  const trEl = document.getElementById('ctx-translate');
+  const sumEl = document.getElementById('ctx-summarize');
+
+  const hasText = !!(msg.text && (msg.type === 'text' || !msg.type));
   if (editEl) editEl.style.display = (isMine && (!msg.type || msg.type === 'text')) ? 'flex' : 'none';
   if (delAllEl) delAllEl.style.display = isMine ? 'flex' : 'none';
+  if (ttsEl) ttsEl.style.display = hasText ? 'flex' : 'none';
+  if (trEl) trEl.style.display = hasText ? 'flex' : 'none';
+  if (sumEl) sumEl.style.display = (hasText && msg.text.length > 80) ? 'flex' : 'none';
 }
 
 document.addEventListener('click', () => {
@@ -801,6 +843,74 @@ document.getElementById('ctx-forward')?.addEventListener('click', async () => {
     container.appendChild(item);
   });
 });
+
+// TTS Message Reader
+document.getElementById('ctx-tts')?.addEventListener('click', async () => {
+  if (!targetContextMessage?.text) return;
+  const menu = document.getElementById('message-context-menu');
+  if (menu) menu.style.display = 'none';
+
+  const ttsPanel = document.getElementById('ai-tts-panel');
+  if (ttsPanel) ttsPanel.style.display = 'block';
+
+  await textToSpeech(targetContextMessage.text, 'uz-UZ', (state, err) => {
+    const header = document.querySelector('.ai-tts-header');
+    if (header) {
+      if (state === 'loading') header.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ovoz yaratilmoqda...';
+      else if (state === 'playing') header.innerHTML = '<i class="fa-solid fa-volume-high" style="color:var(--accent-color);"></i> Ovoz o\'qilmoqda...';
+      else if (state === 'paused') header.innerHTML = '<i class="fa-solid fa-pause"></i> Pauza';
+      else if (state === 'idle') {
+        header.innerHTML = '<i class="fa-solid fa-check"></i> Tugadi';
+        setTimeout(() => { if (ttsPanel) ttsPanel.style.display = 'none'; }, 2000);
+      }
+      else if (state === 'error') header.innerHTML = `<i class="fa-solid fa-circle-exclamation" style="color:var(--danger-color);"></i> ${err || 'Xatolik'}`;
+    }
+    const wf = document.getElementById('tts-waveform');
+    if (wf) {
+      if (state === 'playing') wf.classList.remove('idle');
+      else wf.classList.add('idle');
+    }
+  });
+});
+
+// AI Translation Action
+document.getElementById('ctx-translate')?.addEventListener('click', async () => {
+  if (!targetContextMessage?.text) return;
+  const menu = document.getElementById('message-context-menu');
+  if (menu) menu.style.display = 'none';
+
+  window.showToast?.("AI tarjima qilinmoqda...", "info");
+  try {
+    const translation = await translateText(targetContextMessage.text, 'auto', 'uz');
+    showResultModal("🌐 AI Tarjima (O'zbek tiliga)", translation);
+  } catch (e) {
+    window.showToast?.(e.message || "Tarjimada xatolik", "error");
+  }
+});
+
+// AI Summarize Action
+document.getElementById('ctx-summarize')?.addEventListener('click', async () => {
+  if (!targetContextMessage?.text) return;
+  const menu = document.getElementById('message-context-menu');
+  if (menu) menu.style.display = 'none';
+
+  window.showToast?.("AI qisqartirmoqda...", "info");
+  try {
+    const shortened = await aiWrite('shorten', targetContextMessage.text);
+    showResultModal("📝 AI Qisqartirilgan Matn", shortened);
+  } catch (e) {
+    window.showToast?.(e.message || "Xulosa yaratishda xatolik", "error");
+  }
+});
+
+function showResultModal(title, text) {
+  const modal = document.getElementById('modal-ai-result');
+  const titleEl = document.getElementById('ai-result-modal-title');
+  const textEl = document.getElementById('ai-result-text');
+  if (titleEl) titleEl.innerHTML = title;
+  if (textEl) textEl.textContent = text;
+  if (modal) modal.classList.add('active');
+}
 
 document.getElementById('ctx-edit')?.addEventListener('click', () => {
   if (!targetContextMessage || !messageTextInput) return;
@@ -901,6 +1011,14 @@ window.toggleReaction = async (msgId, emoji) => {
 export async function sendMessagePayload(chatId, text, type = 'text', fileURL = null, fileDetails = null, forwardFrom = null) {
   await authReady;
   if (!chatId || !currentUser) return;
+
+  // AI Content Moderation Check
+  if (text && (type === 'text' || !type)) {
+    const modCheck = await validateAndModerateText(text, currentUser);
+    if (!modCheck.allowed) {
+      return;
+    }
+  }
 
   // Edit mode
   if (editingMessageId) {
@@ -1029,6 +1147,12 @@ sendMsgBtn?.addEventListener('click', async () => {
 export async function handleFileUpload(file, type) {
   if (!activeChatId || !file || !currentUser) return;
 
+  // AI Content Moderation Check BEFORE uploading to server or storage
+  const modCheck = await validateAndModerateMedia(file, type, currentUser);
+  if (!modCheck.allowed) {
+    return;
+  }
+
   let uploadFile = file;
 
   if (type === 'image' && file.size > 200 * 1024) {
@@ -1127,3 +1251,8 @@ function formatBytes(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
+
+export function getActiveChatId() { return activeChatId; }
+export function getActiveChatData() { return activeChatData; }
+export function getCurrentActiveMessages() { return currentActiveMessages; }
+export function getCurrentChatsList() { return currentChatsList; }

@@ -5,7 +5,29 @@ import { initChatListStream, openChatById, handleFileUpload, sendMessagePayload 
 import { loadGroupMemberSelectionList } from './group.js';
 import { initStoriesBar } from './story.js';
 import { initSettingsModule } from './settings.js';
-import { getLocalUsers } from './store.js';
+import { getLocalUsers, getLocalChats, getLocalMessages } from './store.js';
+import {
+  AI_SETTINGS,
+  sendAIChatMessage,
+  clearAIChatHistory,
+  aiWrite,
+  textToSpeech,
+  pauseTTS,
+  stopTTS,
+  startVoiceRecognition,
+  stopVoiceRecognition,
+  analyzeImage,
+  getSmartReplies,
+  translateText,
+  summarizeChat,
+  aiSearch,
+  generateBio,
+  checkAIStatus,
+  initAIChatPanel,
+  initAIWriter,
+  loadSmartReplies
+} from './ai.js';
+import { getActiveChatId, getActiveChatData, getCurrentActiveMessages, getCurrentChatsList } from './chat.js';
 
 import {
   db, storage, collection, query, where, getDocs, getDoc, addDoc, doc,
@@ -34,6 +56,10 @@ window.onTelePulseAuthReady = async (user, userData) => {
   initStoriesBar();
   initSettingsModule();
   initGlobalSearchInput();
+  initAIChatPanel();
+  initAIWriter();
+  initAISettingsToggles();
+  checkAndUpdateAIStatus();
   await initChatListStream(user, userData);
 };
 
@@ -615,5 +641,314 @@ document.getElementById('btn-copy-share-url')?.addEventListener('click', () => {
       btn.innerHTML = '<i class="fa-solid fa-check"></i> Nusxalandi!';
       setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-copy"></i> Nusxalash'; }, 2000);
     }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  AI FEATURES INTEGRATION & ORCHESTRATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── 1. AI Settings Toggles ──────────────────────────────────────────────────
+export function initAISettingsToggles() {
+  const toggleMap = {
+    'ai-toggle-chat': 'chat',
+    'ai-toggle-writer': 'writer',
+    'ai-toggle-tts': 'tts',
+    'ai-toggle-voice': 'voice',
+    'ai-toggle-image': 'imageAnalysis',
+    'ai-toggle-translation': 'translation',
+    'ai-toggle-smart-reply': 'smartReply',
+    'ai-toggle-summary': 'summary'
+  };
+
+  for (const [id, settingKey] of Object.entries(toggleMap)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.checked = AI_SETTINGS[settingKey + 'Enabled'];
+    el.addEventListener('change', () => {
+      AI_SETTINGS.set(settingKey, el.checked);
+      showToast(`${settingKey} ${el.checked ? 'yoqildi' : 'o\'chirildi'}`, 'info');
+    });
+  }
+}
+
+// ─── 2. AI Status Indicator ───────────────────────────────────────────────────
+export async function checkAndUpdateAIStatus() {
+  const status = await checkAIStatus();
+  const statusDot = document.getElementById('ai-status-dot');
+  const settingsDot = document.getElementById('ai-settings-status-dot');
+  const settingsText = document.getElementById('ai-settings-status-text');
+
+  if (status.available) {
+    if (statusDot) { statusDot.classList.add('online'); statusDot.title = `AI faol (${status.model})`; }
+    if (settingsDot) settingsDot.classList.add('online');
+    if (settingsText) settingsText.textContent = `AI xizmati faol (${status.model || 'Gemini'})`;
+  } else {
+    if (statusDot) { statusDot.classList.remove('online'); statusDot.title = 'AI serveri sozlanmagan'; }
+    if (settingsDot) settingsDot.classList.remove('online');
+    if (settingsText) settingsText.textContent = 'AI API kaliti kiritilmagan (.env faylini tekshiring)';
+  }
+}
+
+// ─── 3. AI Chat Side Panel Open / Close ──────────────────────────────────────
+const fabAiChat = document.getElementById('fab-ai-chat');
+const aiChatPanel = document.getElementById('ai-chat-panel');
+const btnCloseAiPanel = document.getElementById('btn-close-ai-panel');
+
+fabAiChat?.addEventListener('click', () => {
+  if (aiChatPanel) {
+    aiChatPanel.classList.toggle('active');
+    if (aiChatPanel.classList.contains('active')) {
+      document.getElementById('ai-chat-input')?.focus();
+    }
+  }
+});
+
+btnCloseAiPanel?.addEventListener('click', () => {
+  aiChatPanel?.classList.remove('active');
+});
+
+// ─── 4. AI Voice Assistant (Speech -> AI -> Audio response) ───────────────────
+let voiceAssistantActive = false;
+const btnAiChatVoice = document.getElementById('btn-ai-chat-voice');
+
+btnAiChatVoice?.addEventListener('click', () => {
+  if (!AI_SETTINGS.voiceEnabled) {
+    showToast("Voice Assistant sozlamalarda o'chirilgan", "warning");
+    return;
+  }
+
+  if (voiceAssistantActive) {
+    stopVoiceRecognition();
+    btnAiChatVoice.classList.remove('recording');
+    voiceAssistantActive = false;
+    return;
+  }
+
+  const aiInput = document.getElementById('ai-chat-input');
+  showToast("Ovoz bilan gapiring... (Mikrofon faol)", "info");
+
+  startVoiceRecognition(
+    (transcript, isFinal) => {
+      if (aiInput) {
+        aiInput.value = transcript;
+        aiInput.dispatchEvent(new Event('input'));
+      }
+      if (isFinal) {
+        btnAiChatVoice.classList.remove('recording');
+        voiceAssistantActive = false;
+        const sendBtn = document.getElementById('ai-chat-send');
+        if (sendBtn && !sendBtn.disabled) {
+          sendBtn.click();
+        }
+      }
+    },
+    (err) => {
+      btnAiChatVoice.classList.remove('recording');
+      voiceAssistantActive = false;
+      showToast(err, "error");
+    },
+    () => {
+      btnAiChatVoice.classList.add('recording');
+      voiceAssistantActive = true;
+    },
+    'uz-UZ'
+  );
+});
+
+// ─── 5. AI Chat Summary Trigger ───────────────────────────────────────────────
+document.getElementById('btn-chat-ai-summary')?.addEventListener('click', async () => {
+  const activeChat = getActiveChatData();
+  const messages = getCurrentActiveMessages();
+
+  if (!activeChat || !messages || messages.length === 0) {
+    showToast("Ushbu chatda umumlashtirish uchun xabarlar yo'q", "info");
+    return;
+  }
+
+  const modal = document.getElementById('modal-ai-summary');
+  const loadingEl = document.getElementById('ai-summary-loading');
+  const contentEl = document.getElementById('ai-summary-content');
+
+  if (modal) modal.classList.add('active');
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (contentEl) contentEl.textContent = '';
+
+  try {
+    const summary = await summarizeChat(messages, activeChat.displayTitle || activeChat.groupName || 'Chat');
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.textContent = summary;
+  } catch (e) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.textContent = `❌ Xatolik: ${e.message}`;
+  }
+});
+
+document.getElementById('btn-copy-ai-summary')?.addEventListener('click', () => {
+  const text = document.getElementById('ai-summary-content')?.textContent;
+  if (text) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    showToast("Xulosa nusxalandi", "success");
+  }
+});
+
+// ─── 6. AI Search Trigger ─────────────────────────────────────────────────────
+const btnAiSearchToggle = document.getElementById('btn-ai-search-toggle');
+btnAiSearchToggle?.addEventListener('click', () => {
+  const modal = document.getElementById('modal-ai-search');
+  const input = document.getElementById('ai-search-modal-input');
+  const globalInput = document.getElementById('global-search-input');
+  if (input && globalInput?.value) {
+    input.value = globalInput.value;
+  }
+  if (modal) modal.classList.add('active');
+  input?.focus();
+});
+
+document.getElementById('btn-run-ai-search')?.addEventListener('click', runAISearchAction);
+document.getElementById('ai-search-modal-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    runAISearchAction();
+  }
+});
+
+async function runAISearchAction() {
+  const input = document.getElementById('ai-search-modal-input');
+  const query = input?.value.trim();
+  if (!query) {
+    showToast("Qidiruv so'rovini kiriting", "warning");
+    return;
+  }
+
+  const loadingEl = document.getElementById('ai-search-loading');
+  const resultsContainer = document.getElementById('ai-search-results-list');
+
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (resultsContainer) resultsContainer.innerHTML = '';
+
+  const currentMessages = getCurrentActiveMessages();
+  const allChats = getCurrentChatsList().length > 0 ? getCurrentChatsList() : getLocalChats();
+
+  const allMessages = [...currentMessages];
+  for (const c of allChats) {
+    const cMsgs = getLocalMessages(c.id);
+    for (const m of cMsgs) {
+      if (!allMessages.find(x => x.id === m.id)) {
+        allMessages.push({ ...m, chatName: c.displayTitle || c.groupName || 'Chat' });
+      }
+    }
+  }
+
+  try {
+    const results = await aiSearch(query, allMessages, allChats);
+    if (loadingEl) loadingEl.style.display = 'none';
+
+    if (!results || results.length === 0) {
+      resultsContainer.innerHTML = `
+        <div style="text-align:center;padding:24px;color:var(--text-muted);">
+          <i class="fa-solid fa-magnifying-glass" style="font-size:24px;margin-bottom:8px;display:block;"></i>
+          Hech qanday mos keluvchi xabar topilmadi.
+        </div>`;
+      return;
+    }
+
+    resultsContainer.innerHTML = '';
+    results.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'ai-search-item';
+      div.innerHTML = `
+        <div class="ai-search-item-header">
+          <span class="ai-search-item-sender">${item.sender || 'Foydalanuvchi'}</span>
+          <span class="ai-search-item-date">${item.date || ''}</span>
+        </div>
+        <div class="ai-search-item-text">${item.text || ''}</div>
+        <div class="ai-search-item-chat"><i class="fa-solid fa-comments"></i> ${item.chat || 'Chat'}</div>`;
+      resultsContainer.appendChild(div);
+    });
+
+  } catch (e) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    resultsContainer.innerHTML = `<div style="color:var(--danger-color);padding:14px;text-align:center;">Xatolik: ${e.message}</div>`;
+  }
+}
+
+// ─── 7. AI Profile Bio Assistant ──────────────────────────────────────────────
+const btnAiBioHelper = document.getElementById('btn-ai-bio-helper');
+const aiBioPanel = document.getElementById('ai-bio-panel');
+let selectedBioStyle = 'professional';
+
+btnAiBioHelper?.addEventListener('click', () => {
+  if (aiBioPanel) {
+    aiBioPanel.style.display = aiBioPanel.style.display === 'none' ? 'block' : 'none';
+    if (aiBioPanel.style.display === 'block') {
+      document.getElementById('ai-bio-desc-input')?.focus();
+    }
+  }
+});
+
+document.querySelectorAll('.ai-bio-style-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ai-bio-style-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedBioStyle = btn.dataset.style || 'professional';
+  });
+});
+
+document.getElementById('btn-generate-bio')?.addEventListener('click', async () => {
+  const descInput = document.getElementById('ai-bio-desc-input');
+  const bioInput = document.getElementById('edit-bio-input');
+  const desc = descInput?.value.trim();
+
+  if (!desc) {
+    showToast("O'zingiz haqingizda biror narsa yozing", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-generate-bio');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+  try {
+    const generated = await generateBio(desc, selectedBioStyle);
+    if (bioInput) {
+      bioInput.value = generated;
+      bioInput.dispatchEvent(new Event('input'));
+    }
+    showToast("AI Bio yaratildi!", "success");
+    if (aiBioPanel) aiBioPanel.style.display = 'none';
+  } catch (e) {
+    showToast(e.message || "Bio yaratishda xatolik", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Yaratish';
+  }
+});
+
+// ─── 8. AI TTS Panel Controls ─────────────────────────────────────────────────
+document.getElementById('btn-close-tts')?.addEventListener('click', () => {
+  stopTTS();
+  const panel = document.getElementById('ai-tts-panel');
+  if (panel) panel.style.display = 'none';
+});
+
+document.getElementById('tts-stop-btn')?.addEventListener('click', () => {
+  stopTTS();
+  const wf = document.getElementById('tts-waveform');
+  if (wf) wf.classList.add('idle');
+  const header = document.querySelector('.ai-tts-header');
+  if (header) header.innerHTML = '<i class="fa-solid fa-stop"></i> To\'xtatildi';
+});
+
+document.getElementById('tts-play-btn')?.addEventListener('click', () => {
+  pauseTTS();
+});
+
+// ─── 9. Copy Result from AI Result Modal ──────────────────────────────────────
+document.getElementById('btn-copy-ai-result')?.addEventListener('click', () => {
+  const text = document.getElementById('ai-result-text')?.textContent;
+  if (text) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    showToast("Nusxalandi", "success");
   }
 });
